@@ -292,6 +292,16 @@ export function createWebServer({ app, channels, updater, desktop, password, dat
       }
     },
 
+    'POST /api/relay/test-reminder': async (req, res) => {
+      if (!app.relay) return json(res, 400, { error: 'Relais indisponible' });
+      try {
+        const r = await app.relay.testReminder();
+        json(res, 200, r);
+      } catch (err) {
+        json(res, 400, { error: err.message });
+      }
+    },
+
     'GET /api/version': async (req, res) => {
       if (!updater) return json(res, 200, { current: null, canUpdate: false, updateAvailable: false });
       json(res, 200, await updater.info());

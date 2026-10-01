@@ -103,9 +103,24 @@ export function createRelayClient({ settings, store, members, telegram, fetchImp
     return true;
   }
 
+  async function testReminder() {
+    const { url, secret } = config();
+    if (!url || !secret) throw new Error('Configure d’abord l’URL et la clé du relais');
+    await push(); // s'assure que le relais a la config la plus récente
+    const res = await fetchImpl(`${url}/test-reminder`, {
+      method: 'POST', headers: { authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(20e3),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) throw new Error('Clé du relais incorrecte');
+    if (res.status === 409) throw new Error(data.error || 'Clique d’abord sur Activer');
+    if (!res.ok) throw new Error(`Relais injoignable (HTTP ${res.status})`);
+    return data;
+  }
+
   return {
     snapshot,
     test,
+    testReminder,
     push,
     start() {
       clearInterval(timer);

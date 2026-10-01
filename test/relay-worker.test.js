@@ -71,3 +71,30 @@ test('pas de snapshot ou agenda illisible : rien', async () => {
   const db = fakeDB(); await seed(db);
   assert.equal((await runOnce({ DB: db }, new Date(), { fetchIcs: async () => { throw new Error('x'); } })).skipped, 'ics-error');
 });
+
+test('/test-reminder : le cloud envoie à l’admin et aux membres actifs', async () => {
+  const db = fakeDB(); await seed(db, { lastSeenMinAgo: 1 });
+  const sent = [];
+  const { runOnce } = await import('../relay/worker.js');
+  // on appelle le fetch handler directement
+  const mod = (await import('../relay/worker.js')).default;
+  const send = [];
+  // simule l'envoi Telegram en interceptant fetch global
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { send.push(JSON.parse(opts.body)); return { json: async () => ({ ok: true }) }; };
+  try {
+    const req = new Request('https://r/test-reminder', { method: 'POST', headers: { authorization: 'Bearer S' } });
+    const res = await mod.fetch(req, { DB: db, RELAY_SECRET: 'S' });
+    const body = await res.json();
+    assert.equal(body.recipients, 2, 'admin + 1 membre actif');
+    assert.equal(send.length, 2);
+    assert.match(send[0].text, /relais cloud/i);
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('/test-reminder : clé incorrecte refusée', async () => {
+  const db = fakeDB(); await seed(db);
+  const mod = (await import('../relay/worker.js')).default;
+  const res = await mod.fetch(new Request('https://r/test-reminder', { method: 'POST', headers: { authorization: 'Bearer MAUVAISE' } }), { DB: db, RELAY_SECRET: 'S' });
+  assert.equal(res.status, 401);
+});

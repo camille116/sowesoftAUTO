@@ -816,6 +816,15 @@ $('#relay-test').addEventListener('click', async () => {
     relayResult(true, 'Relais joignable ✓');
   } catch (err) { relayResult(false, err.message); }
 });
+$('#relay-test-reminder').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/relay/test-reminder', {});
+    relayResult(true, `Envoyé depuis le cloud à ${r.recipients} destinataire(s) ✓ Regarde Telegram 📱 (ce message vient du cloud, pas de ton Mac).`);
+  } catch (err) { relayResult(false, err.message); }
+  btn.disabled = false;
+});
 
 // ── App Mac (Electron) : diagnostic et réparation ─────────
 const inDesktopApp = () => document.documentElement.dataset.shell === 'desktop';

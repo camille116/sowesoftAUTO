@@ -85,6 +85,18 @@ export default {
       return json({ ok: true, sent: merged });
     }
     if (url.pathname === '/state') return json({ sent: await kvGet(env, 'sent', {}), lastSeen: await kvGet(env, 'lastSeen', 0) });
+    if (request.method === 'POST' && url.pathname === '/test-reminder') {
+      const snap = await kvGet(env, 'snapshot');
+      if (!snap?.telegramToken) return json({ error: 'le Mac n’a pas encore envoyé sa configuration' }, 409);
+      const recipients = [];
+      if (snap.owner?.chatId) recipients.push(snap.owner.chatId);
+      for (const m of snap.members || []) if (m.status === 'active' && m.chatId) recipients.push(m.chatId);
+      let ok = 0;
+      for (const chat of recipients) {
+        if (await sendTelegram(snap.telegramToken, chat, '🔔 *Test du relais cloud LinkeD*\nCe message vient du cloud, pas de ton Mac. Les rappels arriveront donc même quand ton Mac est éteint. ✅')) ok++;
+      }
+      return json({ ok: true, sent: ok, recipients: recipients.length });
+    }
     if (request.method === 'POST' && url.pathname === '/clear-sent') { await kvSet(env, 'sent', {}); return json({ ok: true }); }
     return json({ error: 'introuvable' }, 404);
   },
