@@ -1,11 +1,11 @@
 {
-  "name": "Émile – émargement SoWeSoft",
-  "short_name": "Émile",
-  "description": "Rappels et signature SoWeSoft pendant tes heures d'autonomie",
+  "name": "LinkeD",
+  "short_name": "LinkeD",
+  "description": "Rappels et signature SoWeSoft automatiques",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f2ee",
-  "theme_color": "#14213d",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
   "lang": "fr",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }

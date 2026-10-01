@@ -3,250 +3,317 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Émile</title>
-  <meta name="description" content="Ton assistant d'émargement SoWeSoft">
-  <meta name="theme-color" content="#14213d">
+  <title>LinkeD</title>
+  <meta name="description" content="LinkeD – rappels et signature SoWeSoft automatiques">
+  <meta name="theme-color" content="#0b0c10">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Connexion à l'appli -->
+  <!-- ═══ Connexion ═══ -->
   <section id="login" class="login" hidden>
     <form id="login-form" class="login-card">
-      <img src="icon.svg" alt="" class="login-logo" width="64" height="64">
-      <h1 class="brand">Émile</h1>
-      <p class="muted">Tu bosses, Émile veille sur ta signature.</p>
+      <div class="logo logo-lg"><img src="icon.svg" alt="" width="40" height="40"><span>Linke<b>D</b></span></div>
+      <h1>Bon retour 👋</h1>
+      <p class="muted">Connecte-toi à ton espace LinkeD.</p>
       <label class="field">
-        <span>Mot de passe de l'appli</span>
+        <span>Mot de passe</span>
         <input type="password" id="login-password" autocomplete="current-password" required>
       </label>
-      <button class="btn btn-primary btn-block" type="submit">Entrer</button>
+      <button class="btn btn-primary btn-block" type="submit">Se connecter</button>
       <p id="login-error" class="error" role="alert"></p>
     </form>
   </section>
 
   <div id="shell" class="shell" hidden>
-    <header class="topbar">
-      <div class="topbar-brand">
-        <img src="icon.svg" alt="" width="32" height="32">
-        <span class="brand">Émile</span>
+    <!-- ═══ Barre latérale (ordinateur) / onglets (mobile) ═══ -->
+    <aside class="sidebar">
+      <div class="logo"><img src="icon.svg" alt="" width="28" height="28"><span>Linke<b>D</b></span></div>
+      <nav class="nav" aria-label="Navigation">
+        <a href="#home" data-tab="home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>Tableau de bord</span></a>
+        <a href="#planning" data-tab="planning">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span>Planning</span></a>
+        <a href="#history" data-tab="history">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 4v5h5"/></svg>
+          <span>Activité</span></a>
+        <a href="#settings" data-tab="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span>Réglages</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="status-list">
+          <span id="pill-channel" class="pill">Messagerie</span>
+          <span id="pill-mode" class="pill">—</span>
+        </div>
+        <button id="update-chip" class="update-chip" type="button" hidden>
+          <span class="dot"></span> Mise à jour disponible
+        </button>
+        <p id="version-label" class="version mono">v—</p>
       </div>
-      <div class="topbar-status">
-        <span id="pill-channel" class="pill" title="Messagerie">Messagerie</span>
-        <span id="pill-mode" class="pill" title="Mode de signature">—</span>
-      </div>
-    </header>
+    </aside>
 
-    <main>
-      <!-- ACCUEIL -->
+    <main class="main">
+      <!-- ═══ TABLEAU DE BORD ═══ -->
       <section class="view" data-view="home">
+        <header class="page-head">
+          <div>
+            <p class="crumb" id="today-label">—</p>
+            <h1>Tableau de bord</h1>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost btn-sm" type="button" data-notif-test>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              Tester une notif
+            </button>
+          </div>
+        </header>
+
         <div id="alert-login" class="banner banner-danger" hidden></div>
 
-        <article class="card card-hero">
-          <p class="eyebrow" id="hero-eyebrow">En ce moment</p>
-          <h2 id="hero-title">Pas d'autonomie en cours</h2>
-          <p id="hero-meta" class="muted"></p>
-          <div id="hero-progress" class="progress" hidden><span></span></div>
-        </article>
-
-        <form id="sign-form" class="card sign-card" autocomplete="off">
-          <label for="code" class="sign-label">Code du cours</label>
-          <div class="code-wrap">
-            <input id="code" name="code" inputmode="numeric" pattern="\d{5}" maxlength="5" placeholder="•••••"
-                   aria-describedby="code-help" required>
-          </div>
-          <p id="code-help" class="muted small">Les 5 chiffres donnés par l'intervenant·e.</p>
-          <button id="sign-btn" class="btn btn-primary btn-block btn-lg" type="submit">
-            <span class="btn-label">Signer pour moi</span>
-          </button>
-          <div id="sign-result" class="result" hidden></div>
-        </form>
-
-        <div class="grid-2">
-          <article class="card">
-            <p class="eyebrow">Prochain créneau</p>
-            <h3 id="next-title">—</h3>
-            <p id="next-meta" class="muted"></p>
-          </article>
-          <article class="card">
-            <p class="eyebrow">Rappels</p>
+        <div class="kpis">
+          <div class="kpi"><p class="kpi-label">Aujourd'hui</p><p class="kpi-value" id="kpi-today">—</p><p class="kpi-sub" id="kpi-today-sub">créneaux à signer</p></div>
+          <div class="kpi"><p class="kpi-label">Signés · 30 j</p><p class="kpi-value" id="kpi-signed">—</p><p class="kpi-sub" id="kpi-signed-sub">dont par LinkeD</p></div>
+          <div class="kpi"><p class="kpi-label">Prochain</p><p class="kpi-value kpi-value-sm" id="next-title">—</p><p class="kpi-sub" id="next-meta"></p></div>
+          <div class="kpi"><p class="kpi-label">Rappels</p>
             <label class="switch">
               <input type="checkbox" id="toggle-reminders">
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span id="reminders-label">Actifs</span>
+              <span id="reminders-label" class="kpi-value kpi-value-sm">Actifs</span>
             </label>
-            <p class="muted small">Coupe-les pendant les vacances.</p>
-            <button class="btn btn-ghost btn-sm" type="button" data-notif-test>🔔 Envoyer une notif de test</button>
+            <p class="kpi-sub">pause pendant les vacances</p>
+          </div>
+        </div>
+
+        <div class="grid-main">
+          <div class="stack">
+          <article class="card card-session" id="session-card">
+            <div class="card-head">
+              <p class="eyebrow" id="hero-eyebrow">Session en cours</p>
+              <span class="badge" id="hero-badge" hidden></span>
+            </div>
+            <h2 id="hero-title">Aucune session en cours</h2>
+            <p id="hero-meta" class="muted"></p>
+            <div id="hero-progress" class="progress" hidden><span></span></div>
           </article>
+          <article class="card" id="today-card">
+            <div class="card-head"><p class="eyebrow">Aujourd'hui</p><a href="#planning" class="small muted">Tout le planning →</a></div>
+            <ul id="today-list" class="mini-list"></ul>
+          </article>
+          </div>
+
+          <form id="sign-form" class="card sign-card" autocomplete="off">
+            <div class="card-head">
+              <p class="eyebrow">Signature</p>
+              <span class="kbd mono">5 chiffres</span>
+            </div>
+            <label for="code" class="sign-label">Code du cours</label>
+            <div class="otp" id="otp">
+              <input id="code" name="code" inputmode="numeric" pattern="\d{5}" maxlength="5" autocomplete="one-time-code"
+                     aria-describedby="code-help" required>
+              <span class="otp-cell"></span><span class="otp-cell"></span><span class="otp-cell"></span><span class="otp-cell"></span><span class="otp-cell"></span>
+            </div>
+            <p id="code-help" class="muted small">Donné par l'intervenant·e. LinkeD signe sur SoWeSoft à ta place.</p>
+            <button id="sign-btn" class="btn btn-primary btn-block btn-lg" type="submit">
+              <span class="btn-label">Signer maintenant</span>
+            </button>
+            <div id="sign-result" class="result" hidden></div>
+          </form>
         </div>
       </section>
 
-      <!-- PLANNING -->
+      <!-- ═══ PLANNING ═══ -->
       <section class="view" data-view="planning" hidden>
-        <div class="view-head">
-          <h2>Planning</h2>
+        <header class="page-head">
+          <div><p class="crumb">Hyperplanning</p><h1>Planning</h1></div>
           <div class="segmented" role="tablist" id="planning-range">
             <button role="tab" data-days="7" aria-selected="true">7 jours</button>
-            <button role="tab" data-days="31">Mois</button>
+            <button role="tab" data-days="31">30 jours</button>
           </div>
-        </div>
-        <p class="muted small">Tes heures d'autonomie et d'e-learning, lues dans Hyperplanning.</p>
+        </header>
         <div id="ics-alert" class="banner banner-danger" hidden></div>
         <div id="planning-list" class="day-list"></div>
       </section>
 
-      <!-- HISTORIQUE -->
+      <!-- ═══ ACTIVITÉ ═══ -->
       <section class="view" data-view="history" hidden>
-        <div class="view-head"><h2>Historique</h2></div>
-        <ol id="history-list" class="timeline"></ol>
+        <header class="page-head"><div><p class="crumb">Journal</p><h1>Activité</h1></div></header>
+        <ol id="history-list" class="timeline card"></ol>
       </section>
 
-      <!-- RÉGLAGES -->
+      <!-- ═══ RÉGLAGES ═══ -->
       <section class="view" data-view="settings" hidden>
-        <div class="view-head"><h2>Réglages</h2></div>
+        <header class="page-head"><div><p class="crumb">Configuration</p><h1>Réglages</h1></div></header>
 
-        <article class="card stack" id="messaging-card">
-          <h3>Messagerie</h3>
-          <p class="small muted">Là où Émile t'envoie les rappels et où tu lui envoies les codes.</p>
-          <div class="segmented segmented-full segmented-2" id="channel" role="radiogroup" aria-label="Messagerie">
-            <button type="button" role="radio" data-channel="telegram">Telegram</button>
-            <button type="button" role="radio" data-channel="whatsapp">WhatsApp</button>
-          </div>
-
-          <div data-channel-panel="telegram" class="stack">
-            <p id="tg-text">—</p>
-
-            <div id="tg-setup" class="stack" hidden>
-              <ol class="steps">
-                <li>Dans Telegram, ouvre <a href="https://t.me/BotFather" target="_blank" rel="noopener"><b>@BotFather</b></a> et envoie <code>/newbot</code></li>
-                <li>Nom : <b>Émile</b> · identifiant : par exemple <b>EmileSignature_bot</b> (il doit finir par « bot »)</li>
-                <li>BotFather te donne un <b>token</b> (<code>123456789:AAH…</code>) : colle-le ici</li>
-              </ol>
-              <form id="tg-token-form" class="row pair-form">
-                <input id="tg-token" class="input" placeholder="Token du bot" autocomplete="off" spellcheck="false" aria-label="Token du bot Telegram">
-                <button class="btn btn-primary" type="submit">Valider</button>
-              </form>
+        <div class="settings-grid">
+          <!-- Messagerie -->
+          <article class="card stack" id="messaging-card">
+            <div class="section-head">
+              <h3>Messagerie</h3>
+              <p class="muted small">Là où LinkeD t'envoie les rappels et reçoit tes codes.</p>
+            </div>
+            <div class="segmented segmented-full segmented-2" id="channel" role="radiogroup" aria-label="Messagerie">
+              <button type="button" role="radio" data-channel="telegram">Telegram</button>
+              <button type="button" role="radio" data-channel="whatsapp">WhatsApp</button>
             </div>
 
-            <div id="tg-link" class="pair-code" hidden>
-              <p class="eyebrow">Dernière étape</p>
-              <p class="small">Relie le bot à <b>ton</b> compte Telegram : il n'obéira qu'à toi.</p>
-              <div class="row" style="align-items:center;margin-top:10px">
-                <a id="tg-link-btn" class="btn btn-primary" target="_blank" rel="noopener">Relier Telegram</a>
-                <span class="small muted">ou envoie <code id="tg-code">—</code> à <b id="tg-username">ton bot</b></span>
+            <div data-channel-panel="telegram" class="stack">
+              <p id="tg-text">—</p>
+              <div id="tg-setup" class="stack" hidden>
+                <ol class="steps">
+                  <li>Dans Telegram, ouvre <a href="https://t.me/BotFather" target="_blank" rel="noopener"><b>@BotFather</b></a> et envoie <code>/newbot</code></li>
+                  <li>Nom : <b>LinkeD</b> · identifiant : ex. <b>LinkedSignature_bot</b> (doit finir par « bot »)</li>
+                  <li>Colle ici le <b>token</b> reçu (<code>123456789:AAH…</code>)</li>
+                </ol>
+                <form id="tg-token-form" class="row inline-form">
+                  <input id="tg-token" class="input mono" placeholder="Token du bot" autocomplete="off" spellcheck="false" aria-label="Token du bot Telegram">
+                  <button class="btn btn-primary" type="submit">Valider</button>
+                </form>
               </div>
-              <img id="tg-qr" alt="QR code pour ouvrir le bot sur ton téléphone" width="180" height="180" hidden>
-              <p class="small muted center">Sur ordinateur ? Scanne ce QR avec ton téléphone.</p>
+              <div id="tg-link" class="panel" hidden>
+                <p class="eyebrow">Dernière étape</p>
+                <p class="small">Relie le bot à <b>ton</b> compte : il n'obéira qu'à toi.</p>
+                <div class="row" style="align-items:center;margin-top:12px">
+                  <a id="tg-link-btn" class="btn btn-primary" target="_blank" rel="noopener">Relier Telegram</a>
+                  <span class="small muted">ou envoie <code id="tg-code" class="mono">—</code> à <b id="tg-username">ton bot</b></span>
+                </div>
+                <img id="tg-qr" class="qr" alt="QR code pour ouvrir le bot sur ton téléphone" width="168" height="168" hidden>
+              </div>
+              <div class="row">
+                <button class="btn btn-primary" type="button" data-notif-test id="tg-test" hidden>Envoyer une notif de test</button>
+                <button class="btn btn-ghost" type="button" id="tg-unlink" hidden>Relier un autre compte</button>
+                <button class="btn btn-ghost" type="button" id="tg-change" hidden>Changer de bot</button>
+              </div>
             </div>
+
+            <div data-channel-panel="whatsapp" class="stack" hidden>
+              <p class="small muted">Connexion non officielle (« appareil connecté »). Telegram est plus fiable.</p>
+              <form id="wa-number-form" class="row inline-form">
+                <input id="wa-number" class="input mono" inputmode="tel" placeholder="Ton numéro WhatsApp (06…)" aria-label="Ton numéro WhatsApp">
+                <button class="btn btn-ghost" type="submit">Enregistrer</button>
+              </form>
+              <p id="wa-text">—</p>
+              <div id="wa-progress" class="progress progress-inline" hidden><span></span></div>
+              <img id="wa-qr" class="qr" alt="QR code à scanner avec WhatsApp" hidden width="220" height="220">
+              <ol id="wa-steps" class="steps small" hidden>
+                <li>WhatsApp → Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
+                <li>Scanne le QR, puis garde ton téléphone allumé 1 à 3 min</li>
+              </ol>
+              <div id="wa-code-box" class="panel" hidden>
+                <p class="eyebrow">Code de connexion</p>
+                <p id="wa-code" class="code-display mono">— — — —</p>
+                <p class="small muted">WhatsApp → Appareils connectés → Connecter un appareil → « Se connecter avec un numéro de téléphone »</p>
+              </div>
+              <form id="wa-pair-form" class="row inline-form" hidden>
+                <input id="wa-phone" class="input" inputmode="tel" placeholder="Ou ton numéro (06…) pour un code" aria-label="Numéro WhatsApp">
+                <button class="btn btn-ghost" type="submit">Obtenir un code</button>
+              </form>
+              <div class="row">
+                <button id="wa-test" class="btn btn-primary" type="button" data-notif-test hidden>Envoyer une notif de test</button>
+                <button id="wa-reset" class="btn btn-ghost" type="button" hidden>Réinitialiser WhatsApp</button>
+              </div>
+            </div>
+          </article>
+
+          <!-- Notifications -->
+          <article class="card stack" id="notify-card">
+            <div class="section-head">
+              <h3>Notifications</h3>
+              <p class="muted small">Pour quels cours LinkeD te rappelle de signer.</p>
+            </div>
+            <div class="choice-list" id="notify-mode" role="radiogroup" aria-label="Cours notifiés">
+              <button type="button" role="radio" data-mode="auto">
+                <b>Autonomie & e-learning</b><span>Les créneaux sans intervenant (mots-clés)</span></button>
+              <button type="button" role="radio" data-mode="all">
+                <b>Tous les cours</b><span>Chaque cours de ton emploi du temps</span></button>
+              <button type="button" role="radio" data-mode="custom">
+                <b>Sélection</b><span>Uniquement les matières que tu coches</span></button>
+            </div>
+            <div id="course-picker" class="stack" hidden>
+              <div class="row picker-head">
+                <input id="course-search" class="input" placeholder="Filtrer les matières…" aria-label="Filtrer les matières">
+                <span id="course-count" class="small muted mono">0</span>
+              </div>
+              <p id="course-warning" class="banner small" hidden>Aucune matière cochée : tu ne recevras aucun rappel.</p>
+              <ul id="course-list" class="course-list"></ul>
+            </div>
+            <form id="offsets-form" class="stack">
+              <label class="field">
+                <span>Moments des rappels <small class="muted">(minutes par rapport au début)</small></span>
+                <input name="reminderOffsets" class="mono" placeholder="-5, 0, 15, 45">
+                <small class="muted">-5 = 5 min avant · 0 = au début · 15 = 15 min après (si pas encore signé)</small>
+              </label>
+            </form>
+          </article>
+
+          <!-- SoWeSoft + agenda -->
+          <form id="settings-form" class="card stack">
+            <div class="section-head">
+              <h3>Compte SoWeSoft</h3>
+              <p class="muted small">Utilisé uniquement sur ta machine pour signer.</p>
+            </div>
+            <div class="segmented segmented-full" id="method" role="radiogroup" aria-label="Méthode de connexion">
+              <button type="button" role="radio" data-method="password">E-mail</button>
+              <button type="button" role="radio" data-method="code">ID + PIN</button>
+              <button type="button" role="radio" data-method="sso">Microsoft</button>
+            </div>
+            <label class="field"><span>Code établissement</span><input name="institution" class="mono" inputmode="numeric" maxlength="4" pattern="\d{4}"></label>
+            <div data-for="password" class="stack">
+              <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="username"></label>
+              <label class="field"><span>Mot de passe SoWeSoft</span>
+                <input name="password" type="password" autocomplete="new-password" placeholder="•••••• (inchangé)"></label>
+            </div>
+            <div data-for="code" class="grid-2">
+              <label class="field"><span>Identifiant</span><input name="id" class="mono" inputmode="numeric" maxlength="8"></label>
+              <label class="field"><span>PIN</span><input name="pin" class="mono" type="password" inputmode="numeric" maxlength="4" placeholder="•••• (inchangé)"></label>
+            </div>
+            <p data-for="sso" class="muted small">Lance <code>npm run sowesign:login</code> sur la machine et connecte-toi avec Microsoft (session ≈ 25 jours).</p>
+
+            <label class="switch switch-row">
+              <input type="checkbox" name="dryRun">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span><b>Mode test</b><br><span class="muted small">Tape 4 chiffres sur 5 et n'envoie rien à SoWeSoft</span></span>
+            </label>
+
+            <div class="section-head section-sep">
+              <h3>Agenda</h3>
+              <p class="muted small">Ton emploi du temps Hyperplanning (lien iCal).</p>
+            </div>
+            <label class="field"><span>Lien iCal</span>
+              <input name="icsUrl" type="url" class="mono" placeholder="https://…/Telechargements/ical/…ics?…"></label>
+            <label class="field"><span>Mots-clés « autonomie »</span>
+              <input name="keywords" placeholder="autonomie, elearning"></label>
 
             <div class="row">
-              <button class="btn btn-primary" type="button" data-notif-test id="tg-test" hidden>🔔 Envoyer une notif de test</button>
-              <button class="btn btn-ghost" type="button" id="tg-unlink" hidden>Relier un autre compte</button>
-              <button class="btn btn-ghost" type="button" id="tg-change" hidden>Changer de bot</button>
+              <button class="btn btn-primary" type="submit">Enregistrer</button>
+              <button class="btn btn-ghost" type="button" id="test-btn">Tester la connexion SoWeSoft</button>
             </div>
-          </div>
-
-          <div data-channel-panel="whatsapp" class="stack" hidden>
-            <p class="small muted">Non officiel : relie ton WhatsApp comme un « appareil connecté ». Telegram est plus simple et plus fiable.</p>
-
-          <p id="wa-text">—</p>
-          <div id="wa-progress" class="progress progress-ink" hidden><span></span></div>
-          <img id="wa-qr" alt="QR code à scanner avec WhatsApp" hidden width="240" height="240">
-          <ol id="wa-steps" class="steps small" hidden>
-            <li>Ouvre WhatsApp sur ton téléphone</li>
-            <li>Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
-            <li>Scanne ce QR code, puis <b>laisse ton téléphone allumé</b> 1 à 3 min pendant la synchronisation</li>
-          </ol>
-
-          <div id="wa-code-box" class="pair-code" hidden>
-            <p class="eyebrow">Ton code de connexion</p>
-            <p id="wa-code" class="pair-code-value">— — — —</p>
-            <ol class="steps small">
-              <li>WhatsApp → Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
-              <li>En bas : <b>« Se connecter avec un numéro de téléphone »</b></li>
-              <li>Tape ce code (une notification WhatsApp peut aussi s'afficher)</li>
-            </ol>
-          </div>
-
-          <form id="wa-pair-form" class="pair-form" hidden>
-            <p class="small muted">Le QR ne passe pas ? Connecte-toi avec un code à la place :</p>
-            <div class="row">
-              <input id="wa-phone" class="input" inputmode="tel" placeholder="Ton numéro (06…)" aria-label="Numéro WhatsApp à connecter">
-              <button class="btn btn-ghost" type="submit">Obtenir un code</button>
-            </div>
+            <div id="settings-result" class="result" hidden></div>
           </form>
 
-          <div class="row">
-            <button id="wa-test" class="btn btn-primary" type="button" data-notif-test hidden>🔔 Envoyer une notif de test</button>
-            <button id="wa-reset" class="btn btn-ghost" type="button" hidden>Réinitialiser WhatsApp</button>
-          </div>
-                  </div>
-        </article>
-
-        <form id="settings-form" class="card stack">
-          <h3>Connexion SoWeSoft</h3>
-          <div class="segmented segmented-full" id="method" role="radiogroup" aria-label="Méthode de connexion">
-            <button type="button" role="radio" data-method="password">E-mail</button>
-            <button type="button" role="radio" data-method="code">ID + PIN</button>
-            <button type="button" role="radio" data-method="sso">Microsoft</button>
-          </div>
-          <label class="field">
-            <span>Code établissement</span>
-            <input name="institution" inputmode="numeric" maxlength="4" pattern="\d{4}">
-          </label>
-          <div data-for="password" class="stack">
-            <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="username"></label>
-            <label class="field"><span>Mot de passe SoWeSoft</span>
-              <input name="password" type="password" autocomplete="new-password" placeholder="•••••• (inchangé)"></label>
-          </div>
-          <div data-for="code" class="grid-2">
-            <label class="field"><span>Identifiant (8 chiffres)</span><input name="id" inputmode="numeric" maxlength="8"></label>
-            <label class="field"><span>PIN (4 chiffres)</span>
-              <input name="pin" type="password" inputmode="numeric" maxlength="4" placeholder="•••• (inchangé)"></label>
-          </div>
-          <p data-for="sso" class="muted small">Lance <code>npm run sowesign:login</code> sur la machine du bot et connecte-toi avec Microsoft. La session dure environ 25 jours.</p>
-
-          <h3>Signature</h3>
-          <label class="switch">
-            <input type="checkbox" name="dryRun">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span>Mode test <span class="muted small">(tape 4 chiffres sur 5, n'envoie rien)</span></span>
-          </label>
-
-          <h3>Rappels</h3>
-          <label class="field">
-            <span>Minutes par rapport au début du créneau</span>
-            <input name="reminderOffsets" placeholder="-5, 0, 15, 45">
-            <small class="muted">-5 = 5 min avant · 0 = au début · 15 = 15 min après</small>
-          </label>
-          <label class="field">
-            <span>Mots-clés des créneaux à signer</span>
-            <input name="keywords" placeholder="autonomie, elearning">
-          </label>
-          <label class="field">
-            <span>Lien iCal Hyperplanning</span>
-            <input name="icsUrl" type="url" placeholder="https://…/Telechargements/ical/…ics?…">
-          </label>
-
-          <div class="row">
-            <button class="btn btn-primary" type="submit">Enregistrer</button>
-            <button class="btn btn-ghost" type="button" id="test-btn">Tester la connexion SoWeSoft</button>
-          </div>
-          <div id="settings-result" class="result" hidden></div>
-        </form>
-
-        <p class="muted small center">Ne signe que lorsque tu es vraiment en cours : l'émargement atteste ta présence.</p>
+          <!-- Application -->
+          <article class="card stack" id="app-card">
+            <div class="section-head">
+              <h3>Application</h3>
+              <p class="muted small">Version installée et mises à jour.</p>
+            </div>
+            <div class="update-box">
+              <div>
+                <p class="eyebrow">Version</p>
+                <p id="update-version" class="mono">—</p>
+                <p id="update-text" class="small muted">—</p>
+              </div>
+              <button id="update-btn" class="btn btn-primary" type="button" disabled>Mettre à jour</button>
+            </div>
+            <p class="small muted">Ne signe que lorsque tu es vraiment en cours : l'émargement atteste ta présence.</p>
+          </article>
+        </div>
       </section>
     </main>
-
-    <nav class="tabbar" aria-label="Navigation">
-      <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></a>
-      <a href="#planning" data-tab="planning"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg><span>Planning</span></a>
-      <a href="#history" data-tab="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4"/></svg><span>Historique</span></a>
-      <a href="#settings" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Réglages</span></a>
-    </nav>
   </div>
 
   <dialog id="lightbox" class="lightbox">

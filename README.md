@@ -1,60 +1,72 @@
-# ✍️ Émile – ton assistant d'émargement (Telegram ou WhatsApp)
+# ⚡ LinkeD
 
-Émile est un bot **Telegram** (ou WhatsApp) qui :
+**Ne rate plus jamais une signature SoWeSoft.** LinkeD :
 
-1. **lit ton planning** (agenda ICS de l'école et/ou planning manuel) et repère tes **heures d'autonomie** ;
-2. **t'envoie un message quand tu dois signer** sur Sowesoft / SoWeSign, et te relance tant que ce n'est pas fait ;
-3. **signe à ta place** quand tu lui envoies le code de cours à 5 chiffres (`48213`), puis te renvoie une capture d'écran comme preuve.
+1. **lit ton emploi du temps** Hyperplanning (lien iCal) ;
+2. **te rappelle de signer** sur Telegram (ou WhatsApp) pour les cours que tu choisis : autonomie et e-learning, tous les cours, ou une sélection de matières ;
+3. **signe à ta place** quand tu lui envoies le code à 5 chiffres, et te renvoie la capture SoWeSoft comme preuve.
 
-Le tout se pilote depuis **l'appli Émile** : une interface web installable sur ton téléphone.
-
-> Le dossier de cadrage du projet (persona, parcours, ton de marque, architecture, roadmap) est dans [`docs/CADRAGE.md`](docs/CADRAGE.md).
+Tout se pilote depuis **l'app LinkeD** (tableau de bord, planning, activité, réglages), installée sur ton Mac comme une application normale, avec un bouton **« Mettre à jour »**.
 
 ```
- Agenda ICS ───┐                         ┌──────────────┐
-               ├─► Planning ─► Rappels ─►│  Telegram /  │◄── toi : « 48213 »
- planning.json ┘                         │  WhatsApp    │
-                                         └──────┬───────┘
-                                                ▼
-                                   Robot navigateur (Chromium)
-                                                ▼
-                                     SoWeSoft (app.sowesign.com) ✅
+ Hyperplanning ─┐                          ┌──────────────┐
+                ├─► Planning ─► Rappels ──►│  Telegram /  │◄── toi : « 48213 »
+ planning.json ─┘                          │  WhatsApp    │
+                                           └──────┬───────┘
+                                                  ▼
+                                     Robot navigateur (Chromium)
+                                                  ▼
+                                       SoWeSoft (app.sowesign.com) ✅
 ```
+
+| Document | Contenu |
+|---|---|
+| [`docs/INSTALLATION-MAC.md`](docs/INSTALLATION-MAC.md) | **Installer LinkeD sur Mac, sans Terminal** |
+| [`docs/SECURITE.md`](docs/SECURITE.md) | Où sont tes données, qui peut y accéder, audit de sécurité |
+| [`docs/CADRAGE.md`](docs/CADRAGE.md) | Dossier de cadrage : persona, parcours, marque, architecture, roadmap |
 
 ---
 
 ## 🚀 Installation
 
-> 🍎 **Sur Mac : suis le guide pas à pas [`docs/INSTALLATION-MAC.md`](docs/INSTALLATION-MAC.md)** (script automatique, démarrage avec le Mac).
+**Sur Mac (recommandé)** : télécharge le ZIP, puis fais un clic droit sur **« Installer LinkeD.command » → Ouvrir**. C'est tout : l'app **LinkeD** apparaît dans Applications. Le guide pas à pas est dans [`docs/INSTALLATION-MAC.md`](docs/INSTALLATION-MAC.md).
 
-Il faut une machine allumée en continu (Raspberry Pi, petit VPS, vieux PC…) avec **Node.js 20+** ou **Docker**.
+**Ailleurs (Linux, serveur, développement)** : Node.js 22.12 ou plus.
 
 ```bash
-git clone https://github.com/camille116/sowesoftAUTO.git
-cd sowesoftAUTO
-cp .env.example .env        # puis remplis le fichier (voir ci-dessous)
+git clone https://github.com/camille116/sowesoftAUTO.git && cd sowesoftAUTO
+cp .env.example .env        # au minimum : WEB_PASSWORD
 npm install
-npm start                   # puis ouvre http://localhost:3000
+npm start                   # puis http://localhost:3000
 ```
 
-Dans l'appli → **Réglages → Messagerie**, crée et relie ton bot Telegram (ou scanne le QR WhatsApp). Les sessions sont mémorisées dans `data/` : tu ne le fais qu'une fois.
+Avec Docker : `docker compose up -d --build`.
 
-### Avec Docker
+---
 
-```bash
-cp .env.example .env
-docker compose up -d --build
-docker compose logs -f      # journal ; la configuration se fait dans l'appli
-```
+## 📱 L'app
 
-### WhatsApp : quel numéro pour le bot ?
+| Écran | Ce que tu y fais |
+|---|---|
+| **Tableau de bord** | Session en cours (à signer / signé), indicateurs du jour et du mois, **code à 5 cases + « Signer maintenant »**, cours du jour, test de notification, pause des rappels |
+| **Planning** | Tes cours notifiés sur 7 ou 30 jours, avec leur statut et leur type (AUTONOMIE, CRS, ELEARNING…) ; « Fait » ou « Ignorer » |
+| **Activité** | Rappels, signatures (avec la capture SoWeSoft), erreurs |
+| **Réglages** | Messagerie (bot Telegram ou WhatsApp), **cours notifiés**, moments des rappels, compte SoWeSoft, mode test, agenda, **mise à jour** |
 
-| Option | Comment | Où tu parles au bot |
-|---|---|---|
-| **Ton propre numéro** (simple) | Tu scannes le QR avec ton téléphone | Discussion **« Moi (Vous) »** (message à toi-même) |
-| **Un 2e numéro** (plus propre) | SIM/eSIM dédiée ou WhatsApp Business | Une discussion normale avec « Émile » |
+### Choisir les cours notifiés
 
-Dans les deux cas, renseigne **ton** numéro dans `OWNER_NUMBER` : le bot ignore tous les autres.
+Réglages → **Notifications** :
+- **Autonomie & e-learning** (par défaut) : les créneaux dont le type contient un mot-clé (`autonomie`, `elearning`…) ;
+- **Tous les cours** ;
+- **Sélection** : la liste des matières de ton Hyperplanning (60 prochains jours) s'affiche avec leurs types, et tu coches celles que tu veux.
+
+### Mise à jour
+
+Quand une nouvelle version est publiée, **« Mise à jour disponible »** s'affiche en bas à gauche. Réglages → Application → **Mettre à jour** : LinkeD télécharge la dernière version depuis GitHub, l'installe en gardant `data/`, `.env` et `config/planning.json`, puis redémarre (1 à 3 min). Cette fonction est disponible sur Mac, une fois LinkeD installé avec l'installeur.
+
+### Démo
+
+`npm run demo`, puis ouvre http://localhost:3000 (mot de passe `demo`). Faux planning, faux robot ; le code `00000` simule un échec.
 
 ---
 
@@ -62,147 +74,66 @@ Dans les deux cas, renseigne **ton** numéro dans `OWNER_NUMBER` : le bot ignore
 
 | | Telegram | WhatsApp |
 |---|---|---|
-| Type | **Bot officiel** avec son propre contact « Émile » | Ton WhatsApp relié comme un « appareil connecté » (non officiel) |
-| Mise en place | Créer le bot avec @BotFather (2 min), coller le token, « Relier Telegram » | Scanner un QR code |
+| Type | **Bot officiel**, contact « LinkeD » séparé | Ton WhatsApp relié comme « appareil connecté » (non officiel) |
+| Mise en place | Créer le bot avec @BotFather (2 min), coller le token, « Relier Telegram » | Saisir ton numéro, scanner un QR code |
 | Fiabilité | ✅ API stable | ⚠️ Peut casser quand WhatsApp change son site |
-| Ressources | Très léger | Lance un Chromium en plus |
 
-Tout se règle dans l'appli : **Réglages → Messagerie**. Le bot Telegram ne répond qu'au compte relié avec le code de l'appli : les autres reçoivent « Ce bot est privé ». Il n'a pas besoin d'adresse publique (il va chercher les messages lui-même).
+Le bot Telegram ne répond qu'au compte relié avec le code de l'app : les autres reçoivent « Ce bot est privé ».
 
----
-
-## 📱 L'appli Émile
-
-Dès que le bot tourne, ouvre **http://localhost:3000** sur la machine du bot. Depuis ton téléphone, sur le même Wi-Fi, ouvre `http://<ip-de-la-machine>:3000`.
-
-| Écran | Ce que tu y fais |
+| Tu envoies | LinkeD fait |
 |---|---|
-| **Accueil** | Voir le créneau en cours (rouge = à signer, vert = signé), **taper le code et signer** en un bouton, couper/relancer les rappels |
-| **Planning** | Tes autonomies et e-learnings sur 7 jours ou un mois, avec leur statut ; marquer « signé moi-même » ou « ignorer » |
-| **Historique** | Rappels envoyés, signatures (avec la capture SoWeSoft en grand), erreurs |
-| **Réglages** | **Messagerie** (création et liaison du bot Telegram, ou QR WhatsApp), notif de test, identifiants SoWeSoft, mode test, horaires des rappels, mots-clés, lien iCal, bouton « Tester la connexion » |
-
-- **Mot de passe** : définis `WEB_PASSWORD` dans `.env` pour ouvrir l'appli aux autres appareils de ton réseau. Sans mot de passe, elle n'est accessible que depuis la machine du bot.
-- **Installer sur le téléphone** : ouvre l'appli dans Safari ou Chrome, puis « Ajouter à l'écran d'accueil ».
-- Ce que tu modifies dans **Réglages** est enregistré dans `data/settings.json`, jamais commité, et prend le dessus sur `.env`.
-- **Démo sans rien configurer** : `npm run demo`, puis ouvre http://localhost:3000 (mot de passe `demo` ; le code `00000` simule un échec).
-
-> Pour y accéder depuis l'extérieur (4G), ne mets pas l'appli directement sur Internet : passe par un tunnel privé comme [Tailscale](https://tailscale.com) (gratuit), qui relie ton téléphone et la machine du bot.
+| `48213` · `code 48213` | Signe avec ce code et renvoie la capture ✅ |
+| `fait` | Note que tu as signé toi-même, arrête les rappels |
+| `ignore` | Ignore le créneau en cours |
+| `planning` · `demain` · `semaine` | Liste tes créneaux (✅ / ⬜) |
+| `statut` · `pause` · `reprendre` · `test` · `aide` | Statut, couper ou relancer les rappels, tester SoWeSoft, aide |
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ Fonctionnement
 
-### 1. Le planning (`.env` + `config/planning.json`)
+**Planning.** Le lien iCal Hyperplanning est relu toutes les 30 minutes. Pour chaque cours, LinkeD lit la matière (`Matière : …`) et le type (`Type : AUTONOMIE / CRS / ELEARNING…`). `config/planning.json` permet d'ajouter des créneaux à la main (vide par défaut ; exemple dans `config/planning.example.json`).
 
-**Option A – agenda de l'école (recommandé).** La plupart des outils d'emploi du temps (Hyperplanning, Ypareo, Aurion, Google Agenda, Outlook…) proposent un lien d'export **ICS / iCal**. Colle-le dans `ICS_URL`.
-Les créneaux sont retenus si leur titre, description ou lieu contient un des `AUTONOMY_KEYWORDS` (`autonomie,autonome,travail personnel,elearning…`).
+**Rappels.** Par défaut à -5, 0, +15 et +45 minutes par rapport au début du cours, tant que ce n'est pas signé. Après une coupure, seul le dernier rappel dû est envoyé.
 
-**Option B – planning manuel.** Édite `config/planning.json` (vide par défaut ; exemple dans `config/planning.example.json`) :
+**Signature SoWeSoft** (robot Chromium invisible, parcours relevé sur la vraie appli OMNES) :
+1. connexion à `app.sowesign.com` (code établissement 7705, puis e-mail + mot de passe, identifiant + PIN, ou session Microsoft enregistrée via `npm run sowesign:login`) ;
+2. fermeture de la fenêtre « Informations légales » ;
+3. saisie du code à 5 chiffres ;
+4. dessin de la signature si l'école l'exige ;
+5. attente de « Votre présence a bien été enregistrée », puis capture.
 
-```json
-{
-  "weekly":     [{ "day": "mardi", "start": "13:30", "end": "17:00", "title": "Autonomie – projet" }],
-  "dates":      [{ "date": "2026-10-14", "start": "09:00", "end": "12:00", "title": "Rattrapage" }],
-  "exceptions": ["2026-10-27"]
-}
-```
-
-Les deux sources sont fusionnées. Vérifie ce que le bot a compris :
-
-```bash
-npm run planning
-```
-
-### 2. Les rappels
-
-`REMINDER_OFFSETS=-5,0,15,45` → un message 5 min avant, au début, puis 15 et 45 min après si tu n'as toujours pas signé. Les rappels s'arrêtent dès que c'est signé (par le bot ou toi avec « fait »).
-
-### 3. La signature automatique (SoWeSoft – app.sowesign.com)
-
-Le robot reproduit exactement ce que tu fais sur ton téléphone, dans un Chromium invisible :
-
-1. **Connexion** sur `app.sowesign.com/login` : code établissement **7705** (OMNES), puis ta méthode de connexion ;
-2. **Espace étudiant** : il ferme la fenêtre « Informations légales » si elle s'affiche ;
-3. **Code à 5 chiffres** tapé dans les cases du cours en cours ;
-4. **Pad de signature** (si ton école l'exige) : il dessine une signature qui occupe le cadre et valide ;
-5. **Vérification** : il attend « Votre présence a bien été enregistrée » et t'envoie la capture.
-
-Choisis ta méthode de connexion dans `.env` :
-
-| `SOWESIGN_LOGIN_METHOD` | À remplir | Automatique ? |
-|---|---|---|
-| `password` (par défaut) | `SOWESIGN_EMAIL`, `SOWESIGN_PASSWORD` | ✅ oui |
-| `code` | `SOWESIGN_ID` (8 chiffres), `SOWESIGN_PIN` (4 chiffres) | ✅ oui |
-| `sso` (Microsoft OMNES) | rien : lance `npm run sowesign:login` et connecte-toi à la main | ⚠️ à refaire quand la session expire (~25 jours) |
-
-La session SoWeSoft est gardée dans `data/sowesign-profile/` (~25 jours) : le bot ne se reconnecte que lorsqu'elle a expiré.
-
-> 🔒 **Anti-blocage** : SoWeSoft bloque le compte après 3 connexions ratées. Si une connexion échoue, le bot **ne réessaie plus tout seul** et te prévient. Corrige `.env`, puis envoie *test* pour le débloquer.
-
-**Mode test** : laisse `SIGN_DRY_RUN=true` au début. Le bot fait tout le parcours mais tape seulement les **4 premiers chiffres** (rien n'est envoyé à SoWeSoft tant que le 5e n'est pas saisi) et t'envoie la capture. Quand c'est bon, passe à `false`.
-
-Les sélecteurs de l'interface sont dans `config/sowesign.json` : à toucher seulement si SoWeSoft change son application.
-
----
-
-## 💬 Utilisation
-
-| Tu envoies | Émile fait |
-|---|---|
-| `48213` · `code 48213` · `signe 48213` | Signe avec ce code et renvoie une capture ✅ |
-| `fait` · `signé` | Note que tu as signé toi-même, arrête les rappels |
-| `ignore` | Ignore le créneau en cours (cours annulé…) |
-| `planning` · `demain` · `semaine` | Liste tes créneaux d'autonomie (✅ / ⬜) |
-| `statut` | Rappels actifs ?, créneau en cours, prochain créneau |
-| `pause` · `reprendre` | Coupe / relance les rappels (vacances) |
-| `test` | Vérifie la connexion à SoWeSoft (capture) et la débloque après une erreur |
-| `aide` | Rappelle les commandes |
-
-Exemple :
-
-```
-🤖 ✍️ C'est l'heure de signer !
-13:30–17:00 · Autonomie – projet
-👉 Envoie-moi le code et je signe, ou réponds fait si c'est déjà fait.
-
-toi : 48213
-
-🤖 Je signe avec le code 48213… ⏳
-🤖 ✅ Signé !  [capture d'écran]
-```
+- **Session gardée** environ 25 jours : LinkeD ne se reconnecte que lorsqu'elle expire.
+- **Anti-blocage** : SoWeSoft bloque le compte après 3 échecs de connexion. Après un échec, LinkeD ne réessaie plus seul, jusqu'à ce que tu cliques sur « Tester la connexion ».
+- **Mode test** : LinkeD tape 4 chiffres sur 5. Le 5e n'étant pas saisi, rien n'est envoyé à SoWeSoft.
 
 ---
 
 ## 🧪 Développement
 
 ```bash
-npm test     # 45 tests : commandes, planning, rappels, bot, API de l'appli, et parcours SoWeSoft complet dans Chromium
+npm test     # 55 tests : planning, rappels, bot, Telegram, WhatsApp, API, sécurité, mises à jour, parcours SoWeSoft dans Chromium
+npm run demo
 ```
-
-Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui reproduit la structure de la vraie (`test/fixtures/mock-sowesign.js`). Définis `CHROME_PATH` si Chromium n'est pas trouvé ; sinon ce test est ignoré.
 
 ```
 src/
 ├── index.js            point d'entrée
-├── bot.js              logique du bot (indépendante de la messagerie)
 ├── app.js              assemblage + réglages appliqués à chaud
-├── settings.js         réglages modifiables depuis l'appli
+├── bot.js              logique du bot (indépendante de la messagerie)
+├── settings.js         réglages modifiables depuis l'app (data/settings.json)
 ├── telegram.js         canal Telegram (API officielle, long polling)
 ├── whatsapp.js         canal WhatsApp (whatsapp-web.js)
-├── web/                appli : serveur + API (server.js), interface (public/), démo
-├── commands.js         compréhension des messages
-├── messages.js         textes du bot (ton de marque)
-├── reminders.js        calcul des rappels
-├── store.js            état persistant (data/state.json)
-├── planning/           agenda ICS + planning manuel
-└── sowesign/           robot de signature SoWeSoft + connexion manuelle
+├── updater.js          vérification et installation des mises à jour
+├── planning/           agenda ICS (matières, types, sélection) + planning manuel
+├── sowesign/           robot de signature SoWeSoft + connexion manuelle
+└── web/                serveur + API (server.js), interface (public/), démo
+scripts/mac/            install.sh · update.sh · make-app.sh (LinkeD.app) · uninstall.sh
 ```
 
 ---
 
 ## ⚠️ À lire
 
-- **Utilise la signature automatique uniquement quand tu es vraiment en autonomie.** L'émargement atteste ta présence et compte pour l'assiduité, les financements et l'alternance. Signer en étant absent·e reste une fausse déclaration, bot ou pas. Vérifie aussi le règlement de ton école sur les outils d'automatisation.
-- `whatsapp-web.js` n'est pas une API officielle de WhatsApp. Pour un usage perso et modéré (quelques messages par jour vers toi-même), ça marche bien. Si tu préfères une solution officielle, il faut passer par l'API WhatsApp Business (Meta) : voir la roadmap dans le cadrage.
-- `.env` et `data/` contiennent tes identifiants et sessions : ils ne sont **jamais** commités (`.gitignore`). Ne les partage pas.
+- **Utilise la signature automatique uniquement quand tu es vraiment en cours.** L'émargement atteste ta présence et compte pour l'assiduité, les financements et l'alternance. Vérifie aussi le règlement de ton école.
+- Tes identifiants restent **sur ta machine** (`.env`, `data/`, jamais commités). Le dépôt GitHub est public : n'y colle jamais de mot de passe, de token ou ton lien iCal. Les détails sont dans [`docs/SECURITE.md`](docs/SECURITE.md).

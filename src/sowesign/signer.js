@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -54,6 +54,16 @@ export class SowesignSigner {
     // Après un échec de connexion on ne réessaie plus tout seul : SoWeSoft bloque le compte après 3 essais.
     this.loginLocked = null;
     mkdirSync(this.shotsDir, { recursive: true });
+    this.pruneScreenshots();
+  }
+
+  /** Les captures contiennent ton nom et tes cours : on ne garde que les 30 derniers jours. */
+  pruneScreenshots(days = 30) {
+    const limit = Date.now() - days * 24 * 3600e3;
+    for (const name of readdirSync(this.shotsDir)) {
+      const file = join(this.shotsDir, name);
+      try { if (statSync(file).mtimeMs < limit) unlinkSync(file); } catch { /* déjà supprimé */ }
+    }
   }
 
   async withPage(fn) {

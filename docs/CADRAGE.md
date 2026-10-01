@@ -1,4 +1,6 @@
-# Dossier de cadrage – Projet « Émile »
+# Dossier de cadrage – Projet « LinkeD »
+
+> Projet lancé sous le nom de code « LinkeD », renommé **LinkeD** en V2 (positionnement SaaS / tech).
 
 _Assistant WhatsApp d'émargement Sowesoft / SoWeSign_
 
@@ -108,8 +110,9 @@ message reçu
 
 | | |
 |---|---|
-| **Nom** | **Émile**, clin d'œil à *émargement* : un prénom, pour en faire un camarade plutôt qu'un outil |
-| **Promesse** | « Tu bosses, Émile veille sur ta signature. » |
+| **Nom** | **LinkeD** : le lien entre ton planning, ta messagerie et SoWeSoft ; le « D » final met en avant le *Done* (c'est signé) |
+| **Promesse** | « Ne rate plus jamais une signature. » |
+| **Univers visuel** | SaaS tech : sombre par défaut, bordures fines, accent dégradé indigo → cyan, typographie système et chiffres en monospace |
 | **Personnalité** | Bienveillant, fiable, discret, un peu complice |
 | **Ton** | Tutoiement, phrases courtes, pas de jargon, emoji comme repère visuel (pas de déco) |
 | **Signature visuelle** | Chaque message commence par 🤖 ; ✍️ = signer, ✅ = fait, 🚨 = urgent |
@@ -160,6 +163,7 @@ Le **cerveau** (`src/bot.js`) ne dépend pas de WhatsApp : on pourra brancher Te
 | **S2 – Calibrage** | Parcours réel SoWeSoft OMNES relevé et testé (connexion, popup, saisie du code) ; 1 semaine en mode test puis passage en réel | 🟡 en cours |
 | **S2 bis – Appli** | Appli web installable (PWA) : accueil + signature, planning, historique avec captures, réglages, QR WhatsApp | ✅ livré |
 | **S2 ter – Telegram** | Bot Telegram officiel (recommandé), WhatsApp en option, choix dans l'appli, notif de test | ✅ livré |
+| **V2 – LinkeD** | Rebranding SaaS, tableau de bord, choix des cours notifiés, app Mac sans Terminal, bouton « Mettre à jour », audit de sécurité | ✅ livré |
 | **S3 – Confort** | Récap du soir (« 2/2 signés aujourd'hui »), alerte si la session Sowesoft expire, code reçu par mail lu automatiquement (connecteur Gmail) | 💡 |
 | **S4 – Promo** | Multi-utilisateurs, API WhatsApp Business officielle, mini-dashboard d'assiduité | 💡 (avec accord de l'école) |
 

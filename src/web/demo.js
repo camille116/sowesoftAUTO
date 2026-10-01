@@ -8,30 +8,37 @@ import { join } from 'node:path';
 import { config } from '../config.js';
 import { createApp } from '../app.js';
 import { createWebServer } from './server.js';
+import { parseIcs } from '../planning/ics.js';
 
-const pad = (n) => String(n).padStart(2, '0');
-const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const now = new Date();
 const at = (minutes) => new Date(now.getTime() + minutes * 60e3);
-const tomorrow = new Date(now.getTime() + 24 * 3600e3);
+
+// Faux agenda Hyperplanning autour de maintenant (format OMNES)
+const ics = (() => {
+  const stamp = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const ev = (startMin, durMin, subject, type) => {
+    const start = at(startMin);
+    const end = at(startMin + durMin);
+    return ['BEGIN:VEVENT', `UID:${subject}-${startMin}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(end)}`,
+      `SUMMARY:${subject} - SP5 Marketing digital - ${type}`, `DESCRIPTION:Matière : ${subject}\\nType : ${type}\\n`, 'END:VEVENT'].join('\r\n');
+  };
+  const day = 24 * 60;
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0',
+    ev(-200, 110, 'Marketplaces', 'AUTONOMIE'),
+    ev(-25, 120, 'Management de projets digitaux', 'AUTONOMIE'),
+    ev(day - 300, 120, "Outil d'analyse", 'ELEARNING'),
+    ev(day - 120, 120, 'Anglais professionnel', 'CRS'),
+    ev(day + 60, 120, 'Marketplaces', 'CRS'),
+    ev(2 * day - 200, 180, 'Brand content', 'CRS'),
+    ev(3 * day - 100, 120, 'Marketplaces', 'AUTONOMIE'),
+    ev(4 * day - 300, 120, 'Mesure et analyse de la performance', 'CRS'),
+    'END:VCALENDAR'].join('\r\n');
+})();
 
 const demoConfig = {
   ...config,
-  dataDir: mkdtempSync(join(tmpdir(), 'emile-demo-')),
-  planning: {
-    icsUrl: '',
-    keywords: ['autonomie', 'elearning'],
-    manual: {
-      weekly: [],
-      dates: [
-        { date: ymd(now), start: hhmm(at(-200)), end: hhmm(at(-90)), title: 'Marketplaces – AUTONOMIE' },
-        { date: ymd(now), start: hhmm(at(-25)), end: hhmm(at(95)), title: 'Management de projets digitaux – AUTONOMIE' },
-        { date: ymd(tomorrow), start: '09:00', end: '11:00', title: "Outil d'analyse – ELEARNING" },
-        { date: ymd(tomorrow), start: '17:30', end: '19:30', title: 'Marketplaces – AUTONOMIE' },
-      ],
-    },
-  },
+  dataDir: mkdtempSync(join(tmpdir(), 'linked-demo-')),
+  planning: { icsUrl: 'https://demo.invalid/Edt.ics', keywords: ['autonomie', 'elearning'], manual: { weekly: [], dates: [] } },
   sowesign: { ...config.sowesign, dryRun: false, auth: { ...config.sowesign.auth, method: 'password', email: 'prenom.nom@ecole.fr' } },
 };
 
@@ -45,7 +52,7 @@ const fakeSigner = {
   async check() { await new Promise((r) => setTimeout(r, 1200)); return { ok: true }; },
 };
 
-const app = createApp(demoConfig, { signer: fakeSigner });
+const app = createApp(demoConfig, { signer: fakeSigner, fetcher: async () => parseIcs(ics) });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: -5 });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: 0 });
 
@@ -57,7 +64,7 @@ const whatsapp = {
   async send(text) { console.log('[démo WhatsApp]', text); },
 };
 const telegram = {
-  state: { status: process.env.DEMO_TG || 'waiting_link', username: 'EmileSignature_bot', owner: { name: 'Camille' }, linkCode: '3f9a1c2e', error: null },
+  state: { status: process.env.DEMO_TG || 'waiting_link', username: 'LinkedSignature_bot', owner: { name: 'Camille' }, linkCode: '3f9a1c2e', error: null },
   linkUrl() { return `https://t.me/${this.state.username}?start=${this.state.linkCode}`; },
   unlink() { this.state.status = 'waiting_link'; },
   async start(token) { if (token && this.state.status === 'off') this.state.status = 'waiting_link'; },
@@ -71,7 +78,15 @@ const channels = {
 };
 app.settings.update({ channel: process.env.DEMO_CHANNEL || 'telegram' });
 app.onChannelSettings = (v) => v.channel === 'telegram' && telegram.start(v.telegramToken);
+const updater = {
+  updating: false,
+  async info() {
+    return { current: 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0', latest: 'f9e8d7c6b5a4f9e8d7c6b5a4f9e8d7c6b5a4f9e8', latestMessage: 'Nouvelle interface LinkeD',
+      updateAvailable: true, canUpdate: true, updating: this.updating, error: null, lastError: null };
+  },
+  async update() { this.updating = true; setTimeout(() => { this.updating = false; }, 4000); return { started: true }; },
+};
 const port = Number(process.env.WEB_PORT || 3000);
-createWebServer({ app, channels, password: 'demo', dataDir: demoConfig.dataDir }).listen(port, '127.0.0.1', () => {
-  console.log(`Démo Émile : http://localhost:${port}  (mot de passe : demo · code 00000 = échec simulé)`);
+createWebServer({ app, channels, updater, password: 'demo', dataDir: demoConfig.dataDir }).listen(port, '127.0.0.1', () => {
+  console.log(`Démo LinkeD : http://localhost:${port}  (mot de passe : demo · code 00000 = échec simulé)`);
 });

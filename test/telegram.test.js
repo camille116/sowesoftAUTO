@@ -18,7 +18,7 @@ function fakeTelegram({ validToken = TOKEN } = {}) {
     const [, token, method] = /bot([^/]+)\/(\w+)$/.exec(url);
     const reply = (result) => ({ status: 200, json: async () => ({ ok: true, result }) });
     if (token !== validToken) return { status: 401, json: async () => ({ ok: false, error_code: 401, description: 'Unauthorized' }) };
-    if (method === 'getMe') return reply({ username: 'EmileTest_bot' });
+    if (method === 'getMe') return reply({ username: 'LinkedTest_bot' });
     if (method === 'getUpdates') { await sleep(5); return reply(queue.splice(0)); }
     if (method === 'sendMessage') {
       const data = JSON.parse(body);
@@ -47,7 +47,7 @@ test('se relie avec le code de l’appli, puis n’obéit qu’à cette personne
   const { tg, api, received, dataDir, ready } = setup();
   await tg.start(TOKEN);
   assert.equal(tg.state.status, 'waiting_link');
-  assert.equal(tg.linkUrl(), `https://t.me/EmileTest_bot?start=${tg.state.linkCode}`);
+  assert.equal(tg.linkUrl(), `https://t.me/LinkedTest_bot?start=${tg.state.linkCode}`);
 
   api.push(42, '/start mauvaiscode', 'Inconnu');
   api.push(7, `/start ${tg.state.linkCode}`);
@@ -59,7 +59,7 @@ test('se relie avec le code de l’appli, puis n’obéit qu’à cette personne
   assert.equal(JSON.parse(readFileSync(join(dataDir, 'telegram.json'), 'utf8')).owner.chatId, 7);
 
   api.push(7, '48213');
-  api.push(7, '/planning@EmileTest_bot');
+  api.push(7, '/planning@LinkedTest_bot');
   api.push(42, '11111', 'Inconnu');
   await sleep(60);
   assert.deepEqual(received, ['48213', 'planning']);

@@ -3,6 +3,7 @@ import { createApp } from './app.js';
 import { createTelegram } from './telegram.js';
 import { createWhatsApp } from './whatsapp.js';
 import { createWebServer } from './web/server.js';
+import { createUpdater } from './updater.js';
 import { msg } from './messages.js';
 import { log } from './logger.js';
 
@@ -20,12 +21,14 @@ const telegram = createTelegram({
 // WhatsApp : lance un Chromium, donc seulement s'il est choisi.
 let whatsapp = null;
 function ensureWhatsApp() {
-  if (whatsapp) return whatsapp;
-  if (!config.ownerNumber) {
-    log.warn('WhatsApp choisi mais OWNER_NUMBER est vide dans .env (ex : 33612345678)');
+  const number = app.settings.get().whatsappNumber;
+  if (whatsapp) {
+    whatsapp.setOwner(number);
+    return whatsapp;
   }
+  if (!number) log.warn('WhatsApp choisi : indique ton numéro dans l’app (Réglages → Messagerie)');
   whatsapp = createWhatsApp({
-    ownerNumber: config.ownerNumber,
+    ownerNumber: number,
     dataDir: config.dataDir,
     browser: config.browser,
     onMessage: (text) => app.bot.handle(text),
@@ -60,12 +63,24 @@ const loop = () => app.bot.tick().catch((e) => log.error('Erreur tick :', e));
 setInterval(loop, config.reminders.tickSeconds * 1000);
 
 // ── Appli web ───────────────────────────────────────────────
+// Par défaut l'appli n'écoute QUE sur ce Mac. WEB_HOST=0.0.0.0 l'ouvre au réseau local (Wi-Fi) : déconseillé
+// sur un réseau partagé (école), et refusé sans WEB_PASSWORD.
 const { port, password } = config.web;
-const host = config.web.host || (password ? '0.0.0.0' : '127.0.0.1');
-if (!password) log.warn('WEB_PASSWORD vide : l’appli n’est accessible que depuis cette machine (http://localhost).');
-createWebServer({ app, channels, password, dataDir: config.dataDir }).listen(port, host, () => {
-  log.info(`Appli Émile : http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
+let host = config.web.host || '127.0.0.1';
+if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !password) {
+  log.warn('WEB_HOST ouvre l’appli au réseau mais WEB_PASSWORD est vide : accès limité à cette machine.');
+  host = '127.0.0.1';
+}
+const updater = createUpdater({
+  root: config.root,
+  dataDir: config.dataDir,
+  repo: process.env.UPDATE_REPO || 'camille116/sowesoftAUTO',
+  branch: process.env.UPDATE_BRANCH || 'claude/whatsapp-signature-bot-q8m9ha',
+  managed: process.env.LINKED_MANAGED === '1',
+});
+createWebServer({ app, channels, updater, password, dataDir: config.dataDir }).listen(port, host, () => {
+  log.info(`LinkeD : http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
 });
 
 const s = app.settings.get();
-log.info(`Démarrage d'Émile – messagerie : ${s.channel}, rappels à ${s.reminderOffsets.join(', ')} min, mode test : ${s.dryRun}`);
+log.info(`Démarrage de LinkeD – messagerie : ${s.channel}, rappels à ${s.reminderOffsets.join(', ')} min, mode test : ${s.dryRun}`);

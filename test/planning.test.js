@@ -62,3 +62,32 @@ test('format Hyperplanning (OMNES) : détecte « Type : AUTONOMIE », ignore CRS
   const withElearning = autonomyFromCalendar(hp, [...keywords, 'elearning'], ...week);
   assert.equal(withElearning.length, 2);
 });
+
+test('choix des cours : auto (mots-clés), tous, ou matières cochées', async () => {
+  const { coursesFromCalendar, selectCourses, courseInfo } = await import('../src/planning/ics.js');
+  const hp = parseIcs(readFileSync(new URL('./fixtures/hyperplanning.ics', import.meta.url), 'utf8'));
+  const week = [new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00')];
+  const all = coursesFromCalendar(hp, ...week);
+  assert.equal(all.length, 3);
+  assert.deepEqual(all.map((c) => `${c.subject}|${c.type}`).sort(), ["Marketplaces|AUTONOMIE", 'Marketplaces|CRS', "Outil d'analyse|ELEARNING"]);
+
+  assert.equal(selectCourses(all, { mode: 'auto' }, ['autonomie']).length, 1);
+  assert.equal(selectCourses(all, { mode: 'all' }).length, 3);
+  assert.deepEqual(selectCourses(all, { mode: 'custom', subjects: ['marketplaces'] }).map((c) => c.type).sort(), ['AUTONOMIE', 'CRS']);
+  assert.equal(selectCourses(all, { mode: 'custom', subjects: [] }).length, 0);
+
+  assert.deepEqual(courseInfo({ summary: 'Anglais - TD - CRS', description: '' }), { subject: 'Anglais', type: 'CRS' });
+});
+
+test('liste des matières pour l’appli', async () => {
+  const hp = readFileSync(new URL('./fixtures/hyperplanning.ics', import.meta.url), 'utf8');
+  const planning = new Planning({ icsUrl: 'http://x', keywords: ['autonomie'], manual: {} }, { fetcher: async () => parseIcs(hp) });
+  const subjects = await planning.subjects(new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00'));
+  const market = subjects.find((s) => s.subject === 'Marketplaces');
+  assert.equal(market.count, 2);
+  assert.deepEqual(market.types, ['AUTONOMIE', 'CRS']);
+
+  planning.notify = { mode: 'custom', subjects: ["Outil d'analyse"] };
+  const sessions = await planning.between(new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00'));
+  assert.deepEqual(sessions.map((s) => s.subject), ["Outil d'analyse"]);
+});

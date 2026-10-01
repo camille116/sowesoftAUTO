@@ -1,5 +1,5 @@
 import { manualSessions } from './manual.js';
-import { fetchIcs, autonomyFromCalendar } from './ics.js';
+import { fetchIcs, coursesFromCalendar, selectCourses } from './ics.js';
 import { mergeSessions } from './session.js';
 import { log } from '../logger.js';
 
@@ -10,9 +10,10 @@ const ICS_TTL_MS = 30 * 60 * 1000; // on re-télécharge l'agenda toutes les 30 
  * + planning manuel. Le calendrier ICS est mis en cache pour éviter de spammer le serveur.
  */
 export class Planning {
-  constructor({ icsUrl, keywords, manual }, { fetcher = fetchIcs } = {}) {
+  constructor({ icsUrl, keywords, manual, notify }, { fetcher = fetchIcs } = {}) {
     this.icsUrl = icsUrl;
     this.keywords = keywords;
+    this.notify = notify || { mode: 'auto', subjects: [] }; // quels cours déclenchent un rappel
     this.manual = manual;
     this.fetcher = fetcher;
     this.calendar = null;
@@ -38,8 +39,25 @@ export class Planning {
 
   async between(from, to) {
     await this.refresh();
-    const fromIcs = this.calendar ? autonomyFromCalendar(this.calendar, this.keywords, from, to) : [];
+    const fromIcs = this.calendar ? selectCourses(coursesFromCalendar(this.calendar, from, to), this.notify, this.keywords) : [];
     return mergeSessions(fromIcs, manualSessions(this.manual, from, to));
+  }
+
+  /** Toutes les matières de l'agenda (pour choisir lesquelles notifier dans l'appli). */
+  async subjects(from, to) {
+    await this.refresh();
+    if (!this.calendar) return [];
+    const bySubject = new Map();
+    for (const c of coursesFromCalendar(this.calendar, from, to)) {
+      const entry = bySubject.get(c.subject) || { subject: c.subject, types: new Set(), count: 0, next: null };
+      entry.types.add(c.type);
+      entry.count++;
+      if (c.end >= new Date() && (!entry.next || c.start < entry.next)) entry.next = c.start;
+      bySubject.set(c.subject, entry);
+    }
+    return [...bySubject.values()]
+      .map((e) => ({ ...e, types: [...e.types].filter(Boolean).sort() }))
+      .sort((a, b) => (a.next ?? Infinity) - (b.next ?? Infinity) || a.subject.localeCompare(b.subject));
   }
 
   async day(date) {

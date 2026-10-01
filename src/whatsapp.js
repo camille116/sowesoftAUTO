@@ -21,9 +21,10 @@ const START_TIMEOUT_MS = 3 * 60e3;
  *   starting → qr | code → syncing (après le scan, WhatsApp synchronise : 1 à 3 min) → ready
  *   + error / disconnected, avec relance automatique.
  */
-export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onReady, clientFactory }) {
+export function createWhatsApp({ ownerNumber: initialOwner, dataDir, browser, onMessage, onReady, clientFactory }) {
+  let ownerNumber = String(initialOwner || '');
   const sessionDir = join(dataDir, 'whatsapp-session');
-  const ownerJid = `${ownerNumber}@c.us`;
+  let ownerJid = `${ownerNumber}@c.us`;
   const sentIds = new Set(); // évite que le bot se réponde à lui-même dans la discussion « Moi »
   const state = { status: 'starting', qr: null, code: null, percent: null, error: null, since: Date.now() };
   let client = null;
@@ -81,7 +82,8 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
         return;
       }
     }
-    throw new Error(`discussion WhatsApp introuvable pour le ${ownerNumber.replace(/\d{4}$/, '••••')}. Vérifie OWNER_NUMBER (format 336…), ou envoie d'abord « aide » à Émile depuis ton téléphone`);
+    if (!ownerNumber) throw new Error('indique ton numéro WhatsApp dans Réglages → Messagerie');
+    throw new Error(`discussion WhatsApp introuvable pour le ${ownerNumber.replace(/\d{4}$/, '••••')}. Vérifie ton numéro dans Réglages, ou envoie d'abord « aide » à LinkeD depuis ton téléphone`);
   }
 
   async function isFromOwner(message) {
@@ -209,8 +211,19 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
     start();
   }
 
+  /** Change le numéro de la personne qui pilote le bot (réglage de l'appli). */
+  function setOwner(number) {
+    ownerNumber = String(number || '');
+    ownerJid = `${ownerNumber}@c.us`;
+    target = null;
+    ownerIds.clear();
+    ownerIds.add(ownerJid);
+    selfIds.clear();
+  }
+
   return {
     state,
+    setOwner,
     send,
     pair,
     reset,

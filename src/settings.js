@@ -51,6 +51,17 @@ export class Settings {
       next.reminderOffsets = [...new Set(offsets)].sort((a, b) => a - b);
     }
     if ('dryRun' in patch) next.dryRun = Boolean(patch.dryRun);
+    if (patch.notify) {
+      const mode = patch.notify.mode ?? next.notify?.mode ?? 'auto';
+      if (!['auto', 'all', 'custom'].includes(mode)) throw new Error('Choix de notifications inconnu');
+      const subjects = 'subjects' in patch.notify ? toList(patch.notify.subjects) : next.notify?.subjects || [];
+      next.notify = { mode, subjects: [...new Set(subjects)] };
+    }
+    if ('whatsappNumber' in patch) {
+      const n = String(patch.whatsappNumber || '').replace(/\D/g, '').replace(/^0(\d{9})$/, '33$1');
+      if (n && n.length < 10) throw new Error('Numéro WhatsApp invalide (ex : 0612345678)');
+      next.whatsappNumber = n;
+    }
     if ('channel' in patch) {
       if (!CHANNELS.includes(patch.channel)) throw new Error('Messagerie inconnue');
       next.channel = patch.channel;

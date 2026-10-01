@@ -1,7 +1,7 @@
 {
-  "name": "sowesoft-auto",
+  "name": "linked",
   "version": "1.0.0",
-  "description": "Émile – bot WhatsApp qui rappelle de signer sur Sowesoft/SoWeSign pendant les heures d'autonomie et signe avec le code envoyé",
+  "description": "LinkeD – rappels et signature SoWeSoft automatiques (Telegram ou WhatsApp), pilotés depuis une app",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -24,7 +24,7 @@
   "dependencies": {
     "dotenv": "^18.0.5",
     "node-ical": "^0.27.2",
-    "puppeteer": "^24.43.1",
+    "puppeteer": "^25.12.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.34.7"
@@ -32,6 +32,6 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }

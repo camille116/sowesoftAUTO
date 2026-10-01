@@ -1,4 +1,4 @@
-// Émile – interface web (sans framework). Parle à l'API de src/web/server.js.
+// LinkeD – interface web (sans framework). Parle à l'API de src/web/server.js.
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -45,7 +45,7 @@ const views = ['home', 'planning', 'history', 'settings'];
 function route() {
   const name = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
   $$('.view').forEach((v) => (v.hidden = v.dataset.view !== name));
-  $$('.tabbar a').forEach((a) => {
+  $$('.nav a').forEach((a) => {
     if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
@@ -100,36 +100,74 @@ async function loadStatus() {
   banner.hidden = !s.loginLocked;
   if (s.loginLocked) banner.innerHTML = `<b>Connexion SoWeSoft suspendue</b> après un échec (${esc(s.loginLocked)}). Vérifie tes identifiants dans <a href="#settings">Réglages</a>, puis teste la connexion.`;
 
-  const hero = $('.card-hero');
+  const hero = $('#session-card');
+  const badge = $('#hero-badge');
   hero.classList.remove('is-todo', 'is-done');
   const progress = $('#hero-progress');
   if (s.current) {
     const done = s.current.status === 'signed' || s.current.status === 'skipped';
     hero.classList.add(done ? 'is-done' : 'is-todo');
-    $('#hero-eyebrow').textContent = done ? 'En ce moment · signé ✓' : 'En ce moment · à signer';
-    $('#hero-title').textContent = s.current.title;
+    badge.hidden = false;
+    badge.className = `badge ${done ? 'done' : 'todo'}`;
+    badge.textContent = done ? 'Signé' : 'À signer';
+    $('#hero-eyebrow').textContent = 'Session en cours';
+    $('#hero-title').textContent = s.current.subject || s.current.title;
     const left = Math.max(0, Math.round((new Date(s.current.end) - Date.now()) / 60000));
-    $('#hero-meta').textContent = `${fmtTime(s.current.start)} – ${fmtTime(s.current.end)} · encore ${left} min`;
+    $('#hero-meta').textContent = `${fmtTime(s.current.start)} – ${fmtTime(s.current.end)} · ${left} min restantes`;
     const total = new Date(s.current.end) - new Date(s.current.start);
     progress.hidden = false;
     progress.firstElementChild.style.width = `${Math.min(100, ((Date.now() - new Date(s.current.start)) / total) * 100)}%`;
   } else {
-    $('#hero-eyebrow').textContent = 'En ce moment';
-    $('#hero-title').textContent = "Pas d'autonomie en cours";
-    $('#hero-meta').textContent = 'Tu peux quand même signer si un code t’a été donné.';
+    badge.hidden = true;
+    $('#hero-eyebrow').textContent = 'Session en cours';
+    $('#hero-title').textContent = 'Aucune session en cours';
+    $('#hero-meta').textContent = 'Un code t’a été donné ? Tu peux quand même signer avec lui.';
     progress.hidden = true;
   }
 
-  $('#next-title').textContent = s.next ? s.next.title : 'Rien de prévu';
-  $('#next-meta').textContent = s.next ? `${fmtDay(s.next.start)} · ${fmtTime(s.next.start)} – ${fmtTime(s.next.end)}` : 'dans les 14 prochains jours';
+  $('#today-label').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#kpi-today').textContent = s.today ? String(s.today.pending) : '—';
+  $('#kpi-today-sub').textContent = s.today ? `à signer sur ${s.today.total} aujourd'hui` : '';
+  $('#kpi-signed').textContent = s.stats ? String(s.stats.signed) : '—';
+  $('#kpi-signed-sub').textContent = s.stats ? `dont ${s.stats.byBot} par LinkeD` : '';
+  $('#next-title').textContent = s.next ? (s.next.subject || s.next.title) : 'Rien de prévu';
+  $('#next-meta').textContent = s.next ? `${fmtShort(s.next.start)} · ${fmtTime(s.next.start)}` : '14 prochains jours';
 
+  loadToday();
   $('#toggle-reminders').checked = !s.paused;
   $('#reminders-label').textContent = s.paused ? 'En pause' : 'Actifs';
 }
 
+async function loadToday() {
+  let data;
+  try { data = await api('/api/planning?days=1'); } catch { return; }
+  const list = $('#today-list');
+  if (!data.sessions.length) {
+    list.innerHTML = '<li class="empty small">Rien à signer aujourd’hui 🌿</li>';
+    return;
+  }
+  list.innerHTML = data.sessions.map((x) => `
+    <li>
+      <span class="t">${fmtTime(x.start)}–${fmtTime(x.end)}</span>
+      <span class="n">${esc(x.subject || x.title)}</span>
+      <span class="status status-${x.status}">${STATUS[x.status]}</span>
+    </li>`).join('');
+}
+
+function renderOtp() {
+  const value = $('#code').value;
+  $$('.otp-cell').forEach((cell, i) => {
+    cell.textContent = value[i] || '';
+    cell.classList.toggle('filled', Boolean(value[i]));
+    cell.classList.toggle('active', i === Math.min(value.length, 4));
+  });
+}
 $('#code').addEventListener('input', (e) => {
   e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5);
+  renderOtp();
 });
+$('#code').addEventListener('focus', () => { $('#otp').classList.add('focused'); renderOtp(); });
+$('#code').addEventListener('blur', () => $('#otp').classList.remove('focused'));
 
 function renderResult(el, r, { okText, testText }) {
   el.hidden = false;
@@ -157,13 +195,13 @@ $('#sign-form').addEventListener('submit', async (e) => {
     const r = await api('/api/sign', { code });
     if (r.busy) toast('Une signature est déjà en cours');
     else renderResult($('#sign-result'), r, { okText: r.already ? 'Déjà signé ✓' : 'Signé ✓', testText: 'Mode test réussi' });
-    if (r.ok && !r.dryRun) $('#code').value = '';
+    if (r.ok && !r.dryRun) { $('#code').value = ''; renderOtp(); }
   } catch (err) {
     toast(err.message);
   } finally {
     btn.disabled = false;
     btn.classList.remove('is-loading');
-    btn.querySelector('.btn-label').textContent = 'Signer pour moi';
+    btn.querySelector('.btn-label').textContent = 'Signer maintenant';
     loadStatus();
   }
 });
@@ -189,7 +227,7 @@ async function loadPlanning() {
   if (!data.ics.configured) alert.innerHTML = '<b>Aucun lien Hyperplanning.</b> Colle ton lien iCal dans <a href="#settings">Réglages</a> pour voir tes vrais créneaux.';
   else if (data.ics.error) alert.innerHTML = `<b>Hyperplanning illisible</b> (${esc(data.ics.error)}). Vérifie le lien iCal dans <a href="#settings">Réglages</a>.`;
   if (!data.sessions.length) {
-    list.innerHTML = '<div class="empty card"><b>🌿</b>Aucune autonomie sur la période.</div>';
+    list.innerHTML = '<div class="empty card"><b>🌿</b>Aucun cours à signer sur la période.<br><span class="small">Choisis les cours notifiés dans <a href="#settings">Réglages → Notifications</a>.</span></div>';
     return;
   }
   const days = new Map();
@@ -201,13 +239,17 @@ async function loadPlanning() {
   list.innerHTML = [...days.values()].map((slots) => `
     <section class="day">
       <h3>${esc(fmtDay(slots[0].start))}</h3>
+      <div class="day-slots">
       ${slots.map((s) => `
         <div class="slot ${s.current ? 'is-current' : ''}" data-id="${s.id}">
           <div class="slot-time">${fmtTime(s.start)}<span>${fmtTime(s.end)}</span></div>
           <div>
-            <div class="slot-title">${esc(s.title)}</div>
-            <span class="status status-${s.status}">${STATUS[s.status]}${s.signedBy === 'bot' ? ' par Émile' : ''}</span>
-            <span class="slot-sub">${s.source === 'ics' ? 'Hyperplanning' : 'ajouté à la main'}</span>
+            <div class="slot-title">${esc(s.subject || s.title)}</div>
+            <div class="slot-meta">
+              <span class="status status-${s.status}">${STATUS[s.status]}${s.signedBy === 'bot' ? ' par LinkeD' : ''}</span>
+              ${s.type ? `<span class="tag">${esc(s.type)}</span>` : ''}
+              <span class="slot-sub">${s.source === 'ics' ? 'Hyperplanning' : 'ajouté à la main'}</span>
+            </div>
           </div>
           <div class="slot-actions">
             ${s.status === 'pending' || s.status === 'missed'
@@ -216,6 +258,7 @@ async function loadPlanning() {
               : `<button class="chip-btn" data-action="reset" title="Revenir à « à signer »">Annuler</button>`}
           </div>
         </div>`).join('')}
+      </div>
     </section>`).join('');
 }
 
@@ -293,7 +336,7 @@ async function loadWhatsApp() {
   let q;
   try { q = await api('/api/qr'); } catch { return; }
   const text = {
-    ready: '✅ Connecté. Émile t’écrit dans ta discussion « Moi (Vous) » (ou au numéro du bot).',
+    ready: '✅ Connecté. LinkeD t’écrit dans ta discussion « Moi (Vous) » (ou au numéro du bot).',
     qr: 'Scanne ce QR code pour relier ton WhatsApp :',
     code: 'Connexion par code :',
     starting: '⏳ Démarrage de WhatsApp… le QR code arrive (jusqu’à 1 min).',
@@ -303,6 +346,7 @@ async function loadWhatsApp() {
     off: 'WhatsApp n’est pas lancé.',
   }[q.status] || '—';
   $('#wa-text').textContent = text;
+  if (document.activeElement !== $('#wa-number')) $('#wa-number').value = q.number ? `+${q.number}` : '';
 
   $('#wa-qr').hidden = !q.image;
   $('#wa-steps').hidden = !q.image;
@@ -321,6 +365,15 @@ async function loadWhatsApp() {
 
   if (q.status !== 'ready' && !$('[data-view="settings"]').hidden) qrTimer = setTimeout(loadWhatsApp, 3000);
 }
+
+$('#wa-number-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('/api/settings', { whatsappNumber: $('#wa-number').value });
+    toast('Numéro enregistré');
+    loadWhatsApp();
+  } catch (err) { toast(err.message); }
+});
 
 $('#wa-pair-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -443,7 +496,8 @@ async function loadSettings() {
   f.password.placeholder = s.auth.hasPassword ? '•••••• (inchangé)' : 'Ton mot de passe SoWeSoft';
   f.pin.placeholder = s.auth.hasPin ? '•••• (inchangé)' : '4 chiffres';
   f.dryRun.checked = s.dryRun;
-  f.reminderOffsets.value = s.reminderOffsets.join(', ');
+  $('#offsets-form').reminderOffsets.value = s.reminderOffsets.join(', ');
+  setNotifyMode(s.notify?.mode || 'auto');
   f.keywords.value = s.keywords.join(', ');
   f.icsUrl.value = s.icsUrl || '';
   setMethod(s.auth.method);
@@ -455,7 +509,6 @@ $('#settings-form').addEventListener('submit', async (e) => {
   try {
     await api('/api/settings', {
       dryRun: f.dryRun.checked,
-      reminderOffsets: f.reminderOffsets.value,
       keywords: f.keywords.value,
       icsUrl: f.icsUrl.value,
       auth: { method, institution: f.institution.value, email: f.email.value, password: f.password.value, id: f.id.value, pin: f.pin.value },
@@ -479,12 +532,129 @@ $('#test-btn').addEventListener('click', async (e) => {
   try {
     const r = await api('/api/test', {});
     renderResult($('#settings-result'), r, { okText: 'Connexion SoWeSoft OK', testText: '' });
-    if (r.ok) $('#settings-result p').textContent = 'Émile accède bien à ton espace étudiant.';
+    if (r.ok) $('#settings-result p').textContent = 'LinkeD accède bien à ton espace étudiant.';
   } catch (err) { toast(err.message); }
   btn.disabled = false;
   btn.classList.remove('is-loading');
   loadStatus();
 });
+
+$('#offsets-form').reminderOffsets.addEventListener('change', async (e) => {
+  try {
+    const s = await api('/api/settings', { reminderOffsets: e.target.value });
+    e.target.value = s.reminderOffsets.join(', ');
+    toast('Rappels enregistrés');
+  } catch (err) { toast(err.message); }
+});
+$('#offsets-form').addEventListener('submit', (e) => { e.preventDefault(); e.target.reminderOffsets.dispatchEvent(new Event('change')); });
+
+// ── Notifications : quels cours ───────────────────────────
+let notifyMode = 'auto';
+let courses = [];
+
+function setNotifyMode(mode) {
+  notifyMode = mode;
+  $$('#notify-mode button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+  $('#course-picker').hidden = mode !== 'custom';
+  if (mode === 'custom') loadCourses();
+}
+
+$('#notify-mode').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (!b || b.dataset.mode === notifyMode) return;
+  try {
+    await api('/api/settings', { notify: { mode: b.dataset.mode } });
+    setNotifyMode(b.dataset.mode);
+    toast({ auto: 'Notifs : autonomie & e-learning', all: 'Notifs : tous les cours', custom: 'Notifs : ta sélection' }[b.dataset.mode]);
+  } catch (err) { toast(err.message); }
+});
+
+function renderCourses() {
+  const q = $('#course-search').value.trim().toLowerCase();
+  const shown = courses.filter((c) => !q || c.subject.toLowerCase().includes(q));
+  const selectedCount = courses.filter((c) => c.selected).length;
+  $('#course-count').textContent = `${selectedCount}/${courses.length}`;
+  $('#course-warning').hidden = selectedCount > 0 || !courses.length;
+  if (!courses.length) {
+    $('#course-list').innerHTML = '<li class="empty small">Aucun cours trouvé dans Hyperplanning sur les 60 prochains jours. Vérifie le lien iCal (section Agenda).</li>';
+    return;
+  }
+  $('#course-list').innerHTML = shown.map((c) => `
+    <li><label>
+      <input type="checkbox" data-subject="${esc(c.subject)}" ${c.selected ? 'checked' : ''}>
+      <span>
+        <span class="course-name">${esc(c.subject)}</span>
+        <span class="course-meta">
+          ${c.types.map((t) => `<span class="tag ${/AUTONOMIE|ELEARNING/.test(t) ? 'tag-auto' : ''}">${esc(t)}</span>`).join('')}
+          <span>${c.count} séance${c.count > 1 ? 's' : ''}${c.next ? ` · prochaine ${esc(fmtShort(c.next))}` : ''}</span>
+        </span>
+      </span>
+    </label></li>`).join('');
+}
+
+async function loadCourses() {
+  try {
+    courses = (await api('/api/courses')).courses;
+    renderCourses();
+  } catch { /* hors ligne */ }
+}
+
+$('#course-search').addEventListener('input', renderCourses);
+$('#course-list').addEventListener('change', async (e) => {
+  const box = e.target.closest('[data-subject]');
+  if (!box) return;
+  courses.find((c) => c.subject === box.dataset.subject).selected = box.checked;
+  renderCourses();
+  try {
+    await api('/api/settings', { notify: { mode: 'custom', subjects: courses.filter((c) => c.selected).map((c) => c.subject) } });
+  } catch (err) { toast(err.message); }
+});
+
+// ── Application : version et mise à jour ──────────────────
+async function loadVersion() {
+  let v;
+  try { v = await api('/api/version'); } catch { return; }
+  const short = (sha) => (sha ? sha.slice(0, 7) : 'inconnue');
+  $('#version-label').textContent = `LinkeD · ${short(v.current)}`;
+  $('#update-version').textContent = short(v.current);
+  $('#update-chip').hidden = !v.updateAvailable;
+  const btn = $('#update-btn');
+  btn.disabled = !v.canUpdate || v.updating;
+  btn.textContent = v.updating ? 'Mise à jour…' : v.updateAvailable || !v.current ? 'Mettre à jour' : 'Réinstaller';
+  $('#update-text').textContent = v.updating ? 'Installation en cours, LinkeD va redémarrer (1 à 3 min)…'
+    : !v.canUpdate ? 'Mise à jour en un clic disponible quand LinkeD est installé sur Mac avec le script.'
+    : v.error ? `Vérification impossible : ${v.error}`
+    : v.updateAvailable ? `Nouvelle version ${short(v.latest)}${v.latestMessage ? ` : ${v.latestMessage}` : ''}`
+    : 'Tu as la dernière version ✓';
+}
+
+$('#update-btn').addEventListener('click', async () => {
+  if (!confirm('Installer la dernière version de LinkeD ? L’app redémarre (1 à 3 minutes). Tes réglages sont conservés.')) return;
+  try {
+    await api('/api/update', {});
+    $('#update-btn').disabled = true;
+    $('#update-text').textContent = 'Installation en cours, LinkeD va redémarrer (1 à 3 min)…';
+    toast('Mise à jour lancée…');
+    waitForRestart();
+  } catch (err) { toast(err.message); }
+});
+$('#update-chip').addEventListener('click', () => { location.hash = '#settings'; });
+
+function waitForRestart() {
+  const startedAt = Date.now();
+  let wentDown = false;
+  const tick = async () => {
+    const v = await fetch('/api/version').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!v) wentDown = true;
+    else if (!v.updating && (wentDown || Date.now() - startedAt > 20e3)) {
+      if (v.lastError) { toast(`Mise à jour échouée : ${v.lastError}`); return loadVersion(); }
+      toast('LinkeD est à jour ✓');
+      return setTimeout(() => location.reload(), 800);
+    }
+    if (Date.now() - startedAt < 10 * 60e3) setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 3000);
+}
 
 // ── Démarrage ─────────────────────────────────────────────
 let statusTimer;
@@ -493,6 +663,7 @@ function start() {
   $('#shell').hidden = false;
   route();
   loadStatus();
+  loadVersion();
   clearInterval(statusTimer);
   statusTimer = setInterval(() => { if (!document.hidden) loadStatus(); }, 15000);
 }

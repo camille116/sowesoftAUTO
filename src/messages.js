@@ -1,5 +1,5 @@
 /**
- * Ton de marque d'Émile (cf. docs/CADRAGE.md §5) :
+ * Ton de marque de LinkeD (cf. docs/CADRAGE.md §5) :
  * tutoiement, phrases courtes, une action claire par message, emoji comme repère visuel.
  */
 const fmtTime = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -11,7 +11,7 @@ const slot = (s) => `${fmtTime(s.start)}–${fmtTime(s.end)} · ${s.title}`;
 
 export const msg = {
   welcome: () =>
-    `${BOT_TAG} *Émile est en ligne* ✍️\nJe te préviens quand tu dois signer pendant tes heures d'autonomie.\nEnvoie-moi le code à 5 chiffres et je signe pour toi.\n\nTape *aide* pour voir ce que je sais faire.`,
+    `${BOT_TAG} *LinkeD est en ligne* ⚡\nJe te préviens quand tu dois signer pendant tes heures d'autonomie.\nEnvoie-moi le code à 5 chiffres et je signe pour toi.\n\nTape *aide* pour voir ce que je sais faire.`,
 
   help: (dryRun) =>
     `${BOT_TAG} *Ce que je comprends :*\n` +

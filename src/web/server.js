@@ -13,6 +13,44 @@ const TYPES = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
 };
 
+const SESSION_DAYS = 30;
+const MAX_FAILURES = 5; // essais de mot de passe ratés avant blocage temporaire
+const LOCK_MS = 15 * 60e3;
+
+// En-têtes de sécurité : pas d'iframe (clickjacking), scripts/requêtes uniquement depuis l'appli elle-même
+const SECURITY_HEADERS = {
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'x-frame-options': 'DENY',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'content-security-policy': [
+    "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data:",
+    "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'", "object-src 'none'",
+  ].join('; '),
+};
+
+/**
+ * Bloque les requêtes venues d'un autre site (CSRF) et le « DNS rebinding » :
+ * l'appli ne répond qu'aux noms d'hôte locaux, et les POST doivent venir de l'appli elle-même.
+ */
+export function isTrustedRequest(req) {
+  const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  const localHost = host === 'localhost' || host === '::1' || /^127\./.test(host) || host.endsWith('.local')
+    || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(host) || host.endsWith('.ts.net');
+  if (!localHost) return false;
+  if (req.method === 'GET' || req.method === 'HEAD') return true;
+  if (!String(req.headers['content-type'] || '').startsWith('application/json')) return false;
+  const origin = req.headers.origin;
+  if (!origin) return true; // clients non navigateurs (curl, tests)
+  try {
+    return new URL(origin).host.toLowerCase() === String(req.headers.host || '').toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 const sha = (s) => createHash('sha256').update(String(s)).digest();
 const sameSecret = (a, b) => timingSafeEqual(sha(a), sha(b));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -25,6 +63,8 @@ function sessionView(s, store, now) {
     start: s.start.toISOString(),
     end: s.end.toISOString(),
     source: s.source,
+    subject: s.subject,
+    type: s.type,
     status: st.signedAt ? 'signed' : st.skipped ? 'skipped' : s.end < now ? 'missed' : 'pending',
     signedBy: st.signedBy,
     current: s.start <= now && s.end >= now,
@@ -32,14 +72,15 @@ function sessionView(s, store, now) {
 }
 
 /**
- * Appli web d'Émile : API JSON + interface (src/web/public).
+ * Appli web LinkeD : API JSON + interface (src/web/public).
  * Protégée par WEB_PASSWORD ; sans mot de passe, elle n'écoute que sur la machine locale.
  */
-export function createWebServer({ app, channels, password, dataDir }) {
+export function createWebServer({ app, channels, updater, password, dataDir }) {
   const wa = () => channels?.whatsapp || null;
   const tg = () => channels?.telegram || null;
   const { bot, store, planning, signer, settings } = app;
-  const tokens = new Set();
+  const tokens = new Map(); // jeton de session → date d'expiration
+  const failures = new Map(); // adresse IP → { count, until }
 
   const json = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -54,8 +95,11 @@ export function createWebServer({ app, channels, password, dataDir }) {
 
   const isAuthed = (req) => {
     if (!password) return true;
-    const token = /(?:^|;\s*)emile=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
-    return Boolean(token && tokens.has(token));
+    const token = /(?:^|;\s*)linked=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
+    const expires = token && tokens.get(token);
+    if (!expires) return false;
+    if (expires < Date.now()) { tokens.delete(token); return false; }
+    return true;
   };
 
   async function findSession(id) {
@@ -68,14 +112,23 @@ export function createWebServer({ app, channels, password, dataDir }) {
     'GET /api/me': async (req, res) => json(res, 200, { authed: isAuthed(req), passwordRequired: Boolean(password) }),
 
     'POST /api/login': async (req, res) => {
+      const ip = req.socket.remoteAddress || '?';
+      const f = failures.get(ip);
+      if (f && f.until > Date.now()) {
+        return json(res, 429, { error: `Trop d'essais. Réessaie dans ${Math.ceil((f.until - Date.now()) / 60e3)} min.` });
+      }
       const { password: given = '' } = await readBody(req);
-      if (!password || !sameSecret(given, password)) {
+      if (!password || !sameSecret(String(given), password)) {
+        const count = (f?.count || 0) + 1;
+        failures.set(ip, { count, until: count >= MAX_FAILURES ? Date.now() + LOCK_MS : 0 });
+        if (count >= MAX_FAILURES) log.warn(`Connexion à l'appli bloquée 15 min pour ${ip} (${count} essais ratés)`);
         await sleep(1000); // freine les essais en rafale
         return json(res, 401, { error: 'Mot de passe incorrect' });
       }
-      const token = randomBytes(24).toString('hex');
-      tokens.add(token);
-      res.setHeader('set-cookie', `emile=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
+      failures.delete(ip);
+      const token = randomBytes(32).toString('hex');
+      tokens.set(token, Date.now() + SESSION_DAYS * 24 * 3600e3);
+      res.setHeader('set-cookie', `linked=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_DAYS * 24 * 3600}`);
       return json(res, 200, { ok: true });
     },
 
@@ -85,7 +138,12 @@ export function createWebServer({ app, channels, password, dataDir }) {
       const upcoming = await planning.between(now, new Date(now.getTime() + 14 * 24 * 3600e3));
       const next = upcoming.find((s) => s.start > now);
       const s = settings.get();
+      const today = await planning.day(now);
+      const since = now.getTime() - 30 * 24 * 3600e3;
+      const signed = Object.values(store.state.sessions).filter((x) => x.signedAt && new Date(x.signedAt).getTime() >= since);
       json(res, 200, {
+        today: { total: today.length, pending: today.filter((x) => !store.isDone(x.id) && x.end >= now).length },
+        stats: { signed: signed.length, byBot: signed.filter((x) => x.signedBy === 'bot').length },
         messaging: { channel: s.channel, status: channels?.active?.state.status || 'off' },
         paused: store.paused,
         dryRun: s.dryRun,
@@ -99,10 +157,10 @@ export function createWebServer({ app, channels, password, dataDir }) {
     },
 
     'GET /api/qr': async (req, res) => {
-      if (!wa()) return json(res, 200, { status: 'off' });
+      if (!wa()) return json(res, 200, { status: 'off', number: settings.get().whatsappNumber || '' });
       const { status, qr, code, percent, error } = wa().state;
       json(res, 200, {
-        status, code, percent, error,
+        status, code, percent, error, number: settings.get().whatsappNumber || '',
         image: status === 'qr' && qr ? await QRCode.toDataURL(qr, { margin: 1, width: 280 }) : null,
       });
     },
@@ -163,6 +221,19 @@ export function createWebServer({ app, channels, password, dataDir }) {
       });
     },
 
+    'GET /api/courses': async (req, res) => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const list = await planning.subjects(from, new Date(from.getTime() + 60 * 24 * 3600e3));
+      const { mode, subjects } = settings.get().notify;
+      const selected = new Set(subjects);
+      json(res, 200, {
+        mode,
+        icsConfigured: Boolean(planning.icsUrl),
+        courses: list.map((c) => ({ ...c, next: c.next?.toISOString() || null, selected: selected.has(c.subject) })),
+      });
+    },
+
     'GET /api/history': async (req, res) => json(res, 200, { history: store.history.slice(0, 100) }),
 
     'POST /api/sign': async (req, res) => {
@@ -197,6 +268,20 @@ export function createWebServer({ app, channels, password, dataDir }) {
       json(res, 200, { session: sessionView(session, store, new Date()) });
     },
 
+    'GET /api/version': async (req, res) => {
+      if (!updater) return json(res, 200, { current: null, canUpdate: false, updateAvailable: false });
+      json(res, 200, await updater.info());
+    },
+
+    'POST /api/update': async (req, res) => {
+      if (!updater) return json(res, 400, { error: 'Mise à jour indisponible' });
+      try {
+        json(res, 200, await updater.update());
+      } catch (err) {
+        json(res, 400, { error: err.message });
+      }
+    },
+
     'GET /api/settings': async (req, res) => json(res, 200, settings.public()),
 
     'POST /api/settings': async (req, res) => {
@@ -220,8 +305,8 @@ export function createWebServer({ app, channels, password, dataDir }) {
 
   return createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    res.setHeader('x-content-type-options', 'nosniff');
-    res.setHeader('referrer-policy', 'no-referrer');
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+    if (!isTrustedRequest(req)) return json(res, 403, { error: 'Requête refusée (origine non autorisée)' });
     try {
       const route = routes[`${req.method} ${url.pathname}`];
       if (route) {

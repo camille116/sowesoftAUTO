@@ -119,12 +119,12 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
     if (!state.owner || state.owner.chatId !== chatId) {
       await sendText(chatId, state.owner
         ? '🔒 Ce bot est privé.'
-        : '👋 Pour me relier, ouvre l’appli Émile → Réglages → *Relier Telegram*.').catch(() => {});
+        : '👋 Pour me relier, ouvre l’app LinkeD → Réglages → *Relier Telegram*.').catch(() => {});
       return;
     }
 
     if (start) return onReady?.(); // /start sans code : on renvoie juste le message d'accueil
-    // « /planning » ou « /planning@EmileBot » → « planning »
+    // « /planning » ou « /planning@LinkedBot » → « planning »
     await onMessage(text.replace(/^\/([a-z]+)(?:@\w+)?/i, '$1'));
   }
 
@@ -148,7 +148,7 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
           setState({ status: 'error', error: 'Token refusé par Telegram : recopie-le depuis @BotFather' });
           return;
         }
-        if (err.code === 409) setState({ error: 'Un autre programme utilise déjà ce bot (Émile tourne deux fois ?)' });
+        if (err.code === 409) setState({ error: 'Un autre programme utilise déjà ce bot (LinkeD tourne deux fois ?)' });
         log.warn(`Telegram : ${err.message}, nouvel essai dans ${backoff / 1000} s`);
         await sleep(backoff);
         backoff = Math.min(backoff * 2, 60e3);

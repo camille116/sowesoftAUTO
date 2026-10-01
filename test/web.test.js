@@ -56,7 +56,7 @@ after(() => server?.close());
 
 test('sert l’interface et bloque l’API sans connexion', async () => {
   const html = await fetch(base + '/').then((r) => r.text());
-  assert.match(html, /<title>Émile<\/title>/);
+  assert.match(html, /<title>LinkeD<\/title>/);
   assert.equal((await call('/api/status')).status, 401);
   assert.equal((await call('/api/login', { password: 'faux' })).status, 401);
 });
@@ -146,4 +146,48 @@ test('WhatsApp : notification de test (seulement une fois connecté)', async () 
   whatsapp.state.status = 'ready';
   assert.equal((await call('/api/notify-test', {})).status, 200);
   assert.match(whatsapp.sent.at(-1), /Notification de test/);
+});
+
+test('réglage des cours notifiés', async () => {
+  const bad = await call('/api/settings', { notify: { mode: 'nimporte' } });
+  assert.equal(bad.status, 400);
+  const ok = await call('/api/settings', { notify: { mode: 'custom', subjects: ['Marketplaces', 'Anglais'] } });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(app.planning.notify, { mode: 'custom', subjects: ['Marketplaces', 'Anglais'] });
+  const courses = await call('/api/courses');
+  assert.equal(courses.body.mode, 'custom');
+  assert.ok(Array.isArray(courses.body.courses));
+  await call('/api/settings', { notify: { mode: 'auto' } });
+  assert.deepEqual(app.planning.notify.subjects, ['Marketplaces', 'Anglais'], 'garde la sélection quand on change de mode');
+});
+
+test('sécurité : refuse les autres sites (CSRF) et les noms d’hôte inconnus (DNS rebinding)', async () => {
+  const raw = (path, { method = 'POST', headers = {}, body = '{}' } = {}) =>
+    fetch(base + path, { method, headers: { cookie, ...headers }, body: method === 'GET' ? undefined : body }).then((r) => r.status);
+  // un site piégé envoie un formulaire / fetch « simple » sans JSON
+  assert.equal(await raw('/api/sign', { headers: { 'content-type': 'text/plain' }, body: '{"code":"12345"}' }), 403);
+  // JSON mais depuis une autre origine
+  assert.equal(await raw('/api/sign', { headers: { 'content-type': 'application/json', origin: 'https://evil.example' } }), 403);
+  // même origine : accepté (400 car code invalide)
+  assert.equal(await raw('/api/sign', { headers: { 'content-type': 'application/json', origin: base } }), 400);
+  // nom d'hôte non local (DNS rebinding)
+  const { request } = await import('node:http');
+  const status = await new Promise((resolve) => {
+    const r = request(base + '/api/status', { headers: { host: 'evil.example:3000', cookie } }, (res) => resolve(res.statusCode));
+    r.end();
+  });
+  assert.equal(status, 403);
+});
+
+test('sécurité : en-têtes anti-iframe et CSP', async () => {
+  const res = await fetch(base + '/');
+  assert.equal(res.headers.get('x-frame-options'), 'DENY');
+  assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+});
+
+test('sécurité : blocage après 5 mauvais mots de passe', async () => {
+  for (let i = 0; i < 5; i++) assert.equal((await call('/api/login', { password: `faux${i}` })).status, 401);
+  const blocked = await call('/api/login', { password: 'mdp-appli' });
+  assert.equal(blocked.status, 429, 'même le bon mot de passe est refusé pendant le blocage');
+  assert.match(blocked.body.error, /Trop d'essais/);
 });
