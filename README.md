@@ -24,6 +24,8 @@ Le tout se pilote depuis **l'appli Émile** : une interface web installable sur 
 
 ## 🚀 Installation
 
+> 🍎 **Sur Mac : suis le guide pas à pas [`docs/INSTALLATION-MAC.md`](docs/INSTALLATION-MAC.md)** (script automatique, démarrage avec le Mac).
+
 Il faut une machine allumée en continu (Raspberry Pi, petit VPS, vieux PC…) avec **Node.js 20+** ou **Docker**.
 
 ```bash
