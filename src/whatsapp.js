@@ -21,7 +21,7 @@ const START_TIMEOUT_MS = 3 * 60e3;
  *   starting → qr | code → syncing (après le scan, WhatsApp synchronise : 1 à 3 min) → ready
  *   + error / disconnected, avec relance automatique.
  */
-export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onReady }) {
+export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onReady, clientFactory }) {
   const sessionDir = join(dataDir, 'whatsapp-session');
   const ownerJid = `${ownerNumber}@c.us`;
   const sentIds = new Set(); // évite que le bot se réponde à lui-même dans la discussion « Moi »
@@ -34,30 +34,69 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
     Object.assign(state, patch);
   };
 
+  // WhatsApp identifie désormais certaines discussions par un « LID » au lieu du numéro
+  // (surtout la discussion « Moi »). On cherche donc le bon identifiant, puis on le garde.
+  let target = null;
+  const ownerIds = new Set([ownerJid]);
+  const selfIds = new Set();
+
+  async function resolveIds() {
+    const add = (set, id) => id && set.add(id);
+    const me = client.info?.wid;
+    if (me) add(selfIds, me._serialized);
+    add(selfIds, await client.pupPage?.evaluate(() =>
+      window.require('WAWebUserPrefsMeUser').getMaybeMeLidUser?.()?._serialized).catch(() => null));
+    if (me?.user === ownerNumber) selfIds.forEach((id) => ownerIds.add(id));
+
+    add(ownerIds, (await client.getNumberId(ownerNumber).catch(() => null))?._serialized);
+    const [ids] = await client.getContactLidAndPhone([ownerJid]).catch(() => []);
+    add(ownerIds, ids?.lid);
+    add(ownerIds, ids?.pn);
+    log.info(`WhatsApp : destinataires possibles ${[...ownerIds].map((i) => i.replace(/^\d+(?=\d{2}@)/, '…')).join(', ')}`);
+  }
+
+  async function sendTo(chatId, text, imagePath) {
+    return imagePath
+      ? client.sendMessage(chatId, MessageMedia.fromFilePath(imagePath), { caption: text })
+      : client.sendMessage(chatId, text);
+  }
+
   async function send(text, imagePath) {
     if (state.status !== 'ready') {
       log.warn('WhatsApp pas encore connecté, message non envoyé');
       return;
     }
-    const sent = imagePath
-      ? await client.sendMessage(ownerJid, MessageMedia.fromFilePath(imagePath), { caption: text })
-      : await client.sendMessage(ownerJid, text);
-    sentIds.add(sent.id._serialized);
-    if (sentIds.size > 500) sentIds.delete(sentIds.values().next().value);
+    if (!ownerIds.size || ownerIds.size === 1) await resolveIds();
+    // le dernier identifiant qui a marché d'abord, puis les autres
+    const candidates = [...new Set([target, ...ownerIds].filter(Boolean))];
+    for (const chatId of candidates) {
+      const sent = await sendTo(chatId, text, imagePath).catch((err) => {
+        log.warn(`WhatsApp : envoi vers ${chatId} impossible (${err.message || err})`);
+        return null;
+      });
+      if (sent?.id?._serialized) {
+        target = chatId;
+        sentIds.add(sent.id._serialized);
+        if (sentIds.size > 500) sentIds.delete(sentIds.values().next().value);
+        return;
+      }
+    }
+    throw new Error(`discussion WhatsApp introuvable pour le ${ownerNumber.replace(/\d{4}$/, '••••')}. Vérifie OWNER_NUMBER (format 336…), ou envoie d'abord « aide » à Émile depuis ton téléphone`);
   }
 
   async function isFromOwner(message) {
+    if (!selfIds.size) await resolveIds();
     if (message.fromMe) {
       // bot sur ton propre numéro : on n'écoute que la discussion avec toi-même
-      const me = client.info?.wid;
-      return me?.user === ownerNumber && message.to === me._serialized;
+      return client.info?.wid?.user === ownerNumber && selfIds.has(message.to);
     }
+    if (ownerIds.has(message.from)) return true;
     const contact = await message.getContact();
     return contact.number === ownerNumber;
   }
 
   function makeClient() {
-    const c = new Client({
+    const c = clientFactory ? clientFactory() : new Client({
       authStrategy: new LocalAuth({ dataPath: sessionDir }),
       puppeteer: {
         headless: browser.headless,
