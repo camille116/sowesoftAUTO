@@ -173,12 +173,15 @@ export class Bot {
     return this.send(msg.status({ paused: this.store.paused, current, next, dryRun: this.dryRun, store: this.store }));
   }
 
-  async test() {
-    await this.send(msg.testing());
+  /** Test de connexion SoWeSoft. Depuis l'app (notify: false), aucun message n'est envoyé sur la messagerie. */
+  async test({ notify = true } = {}) {
+    if (notify) await this.send(msg.testing());
     const result = await this.signer.check();
     this.store.log('test', { ok: result.ok, reason: result.reason, screenshot: result.screenshot ? basename(result.screenshot) : undefined });
-    if (result.ok) await this.send(msg.testOk(), result.screenshot);
-    else await this.send(msg.testFailed(result.reason), result.screenshot);
+    if (notify) {
+      if (result.ok) await this.send(msg.testOk(), result.screenshot);
+      else await this.send(msg.testFailed(result.reason), result.screenshot);
+    }
     return result;
   }
 }

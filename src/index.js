@@ -15,7 +15,8 @@ const welcome = (channel) => () => channel.send(msg.welcome()).catch((e) => log.
 const telegram = createTelegram({
   dataDir: config.dataDir,
   onMessage: (text) => app.bot.handle(text),
-  onReady: () => welcome(telegram)(),
+  // message d'accueil seulement quand tu relies le bot (pas à chaque démarrage)
+  onOwnerLinked: () => welcome(telegram)(),
   // camarades de classe : rappels seulement
   members: app.members,
   onMemberMessage: (member, text) => app.bot.handleMember(member, text),
@@ -40,7 +41,7 @@ function ensureWhatsApp() {
     dataDir: config.dataDir,
     browser: config.browser,
     onMessage: (text) => app.bot.handle(text),
-    onReady: () => welcome(whatsapp)(),
+    onReady: () => log.info('WhatsApp prêt'),
   });
   whatsapp.start();
   return whatsapp;

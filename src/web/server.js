@@ -249,7 +249,7 @@ export function createWebServer({ app, channels, updater, password, dataDir }) {
     },
 
     'POST /api/test': async (req, res) => {
-      const result = await bot.test();
+      const result = await bot.test({ notify: false }); // le résultat s'affiche dans l'app, pas sur Telegram
       json(res, 200, { ok: result.ok, reason: result.reason, screenshot: result.screenshot ? result.screenshot.split(/[\\/]/).pop() : null });
     },
 

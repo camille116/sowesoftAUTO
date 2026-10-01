@@ -2,8 +2,10 @@
  * Ton de marque de LinkeD (cf. docs/CADRAGE.md §5) :
  * tutoiement, phrases courtes, une action claire par message, emoji comme repère visuel.
  */
-const fmtTime = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-const fmtDay = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+// Fuseau explicite : ce fichier sert aussi au relais cloud (Cloudflare tourne en UTC)
+const TZ = globalThis.process?.env?.TZ || 'Europe/Paris';
+const fmtTime = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const fmtDay = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
 
 export const BOT_TAG = '🤖';
 
@@ -23,14 +25,14 @@ export const TEMPLATE_VARS = {
 
 /** Remplace {prenom}, {cours}… dans un modèle de message. */
 export function renderTemplate(template, { member, session, offset }) {
-  const fmt = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const fmt = fmtTime;
   const vars = {
     prenom: member?.name || '',
     cours: session?.subject || session?.title || '',
     type: session?.type || '',
     debut: session ? fmt(session.start) : '',
     fin: session ? fmt(session.end) : '',
-    date: session ? session.start.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '',
+    date: session ? fmtDay(session.start) : '',
     moment: offset == null ? '' : offset < 0 ? `dans ${-offset} min` : offset === 0 ? 'maintenant' : `depuis ${offset} min`,
   };
   return String(template || DEFAULT_MEMBER_TEMPLATE).replace(/\{(\w+)\}/g, (all, key) => (key in vars ? vars[key] : all));

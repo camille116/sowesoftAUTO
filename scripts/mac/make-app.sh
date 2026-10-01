@@ -24,6 +24,12 @@ make_icns() {  # $1 = fichier .icns de sortie
   iconutil -c icns "$set" -o "$1"
 }
 
+# L'app native a besoin d'Electron (≈ 100 Mo) : on l'installe ici si besoin,
+# pour que l'installeur ET le bouton « Mettre à jour » donnent toujours la vraie app.
+if [ ! -d "$ELECTRON_APP" ] && [ -f "$DESKTOP/package.json" ] && command -v npm >/dev/null 2>&1; then
+  (cd "$DESKTOP" && npm install --no-audit --no-fund --loglevel=error) >&2 || true
+fi
+
 rm -rf "$APP"
 
 if [ -d "$ELECTRON_APP" ]; then
@@ -39,6 +45,10 @@ if [ -d "$ELECTRON_APP" ]; then
   plutil -replace CFBundleDisplayName -string "LinkeD" "$PL"
   plutil -replace CFBundleIdentifier -string "com.linked.desktop" "$PL"
   plutil -replace NSHumanReadableCopyright -string "LinkeD" "$PL" 2>/dev/null || true
+  # Service d'arrière-plan rangé DANS l'app : macOS l'affiche « LinkeD » (avec l'icône) dans
+  # Ouverture et extensions, et Spotlight ne le propose pas comme un fichier à ouvrir.
+  cp "$APP_DIR/scripts/mac/linked-service" "$APP/Contents/MacOS/linked-service"
+  chmod +x "$APP/Contents/MacOS/linked-service"
   # signature locale : obligatoire sur les Mac Apple Silicon après modification de l'app
   codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
 else
@@ -70,6 +80,8 @@ done
 open "$URL"
 LAUNCHER
   chmod +x "$APP/Contents/MacOS/LinkeD"
+  cp "$APP_DIR/scripts/mac/linked-service" "$APP/Contents/MacOS/linked-service"
+  chmod +x "$APP/Contents/MacOS/linked-service"
   make_icns "$APP/Contents/Resources/AppIcon.icns"
 fi
 

@@ -48,7 +48,7 @@ Entre ton mot de passe, puis va dans **Réglages** :
 
 ## La notification « Activité des apps en arrière-plan »
 
-Juste après l'installation, macOS affiche « *LinkeD* (ou *caffeinate*) peut s'exécuter en arrière-plan ». **C'est normal** : c'est le service qui envoie les rappels et empêche la mise en veille pendant qu'il tourne (`caffeinate` est l'outil d'Apple qui garde le Mac éveillé). Ne le désactive pas dans Réglages Système → Général → **Ouverture et extensions**, sinon les rappels s'arrêtent.
+Juste après l'installation, macOS affiche « *LinkeD* peut s'exécuter en arrière-plan » (« *caffeinate* » sur les anciennes installations). **C'est normal** : c'est le service qui envoie les rappels et empêche la mise en veille pendant qu'il tourne (`caffeinate` est l'outil d'Apple qui garde le Mac éveillé). Ne le désactive pas dans Réglages Système → Général → **Ouverture et extensions**, sinon les rappels s'arrêtent.
 
 ## Garder le Mac éveillé
 
@@ -63,6 +63,12 @@ Va aussi dans **Réglages Système → Batterie → Options** et active **« Emp
 Par sécurité, l'app n'est accessible **que depuis ton Mac**. Sur le Wi-Fi de l'école, n'importe qui pourrait sinon essayer de s'y connecter. Sur ton téléphone, utilise directement le **bot Telegram** : code, `/planning`, `/statut`…
 
 Pour ouvrir quand même l'app sur ton téléphone, le plus sûr est [Tailscale](https://tailscale.com) (gratuit) : il crée un réseau privé entre ton Mac et ton téléphone. Ajoute ensuite `WEB_HOST=0.0.0.0` dans `~/LinkeD/.env`.
+
+## L'app ne s'affiche pas dans le Dock / le Terminal s'ouvre
+
+- Ouvre LinkeD depuis le dossier **Applications** (icône LinkeD) ou le Launchpad. Dans Spotlight, choisis bien le résultat **Application**, pas un fichier.
+- Le Terminal ne s'ouvre que pour **« Installer LinkeD.command »**, c'est-à-dire l'installeur, une seule fois.
+- Si l'app s'ouvre dans une fenêtre de navigateur au lieu de sa propre fenêtre, l'app Mac n'a pas pu être téléchargée. Clique sur **Réglages → Application → Mettre à jour** (ou relance l'installeur) : elle sera recréée.
 
 ## En cas de souci
 

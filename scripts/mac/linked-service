@@ -1,0 +1,6 @@
+#!/bin/bash
+# Service LinkeD en arrière-plan (lancé par launchd au démarrage du Mac, depuis l'intérieur de LinkeD.app).
+# caffeinate -i : empêche la mise en veille automatique tant que LinkeD tourne.
+HOME_DIR="${LINKED_HOME:-$HOME/LinkeD}"
+cd "$HOME_DIR" || exit 1
+exec /usr/bin/caffeinate -i "${LINKED_NODE:-node}" src/index.js

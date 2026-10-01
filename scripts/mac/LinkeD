@@ -1,6 +1,0 @@
-#!/bin/bash
-# Service LinkeD en arrière-plan (lancé par launchd au démarrage du Mac).
-# Ce fichier porte le nom « LinkeD » pour que macOS l'affiche ainsi dans « Ouverture et extensions ».
-# caffeinate -i : empêche la mise en veille automatique tant que LinkeD tourne.
-cd "$(dirname "$0")/../.." || exit 1
-exec /usr/bin/caffeinate -i "${LINKED_NODE:-node}" src/index.js

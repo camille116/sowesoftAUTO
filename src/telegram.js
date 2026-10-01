@@ -30,7 +30,7 @@ const COMMANDS = [
  * state.status : off (pas de token) → starting → waiting_link (bot prêt, pas encore relié) → ready
  *                + error (token invalide, autre instance…)
  */
-export function createTelegram({ dataDir, onMessage, onReady, members = null, onMemberMessage, onMemberLinked, fetchImpl = fetch, pollTimeout = 50 }) {
+export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, members = null, onMemberMessage, onMemberLinked, fetchImpl = fetch, pollTimeout = 50 }) {
   const file = join(dataDir, 'telegram.json');
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const state = {
@@ -145,6 +145,7 @@ export function createTelegram({ dataDir, onMessage, onReady, members = null, on
       setState({ status: 'ready', error: null });
       log.info(`Telegram relié à ${name}`);
       onReady?.();
+      onOwnerLinked?.();
       return;
     }
 
@@ -167,7 +168,7 @@ export function createTelegram({ dataDir, onMessage, onReady, members = null, on
       return;
     }
 
-    if (start) return onReady?.(); // /start sans code : on renvoie juste le message d'accueil
+    if (start) return onMessage('aide'); // /start sans code : rappel des commandes
     // « /planning » ou « /planning@LinkedBot » → « planning »
     await onMessage(text.replace(/^\/([a-z]+)(?:@\w+)?/i, '$1'));
   }

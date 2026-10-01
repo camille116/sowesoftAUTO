@@ -49,9 +49,11 @@ mkdir -p "$APP_DIR"
 if [ "$SRC_DIR" != "$APP_DIR" ]; then
   rsync -a --delete \
     --exclude node_modules --exclude data --exclude .env --exclude .git --exclude VERSION \
+    --exclude "Installer LinkeD.command" \
     "$SRC_DIR/" "$APP_DIR/"
 fi
 mkdir -p "$APP_DIR/data"
+rm -f "$APP_DIR/Installer LinkeD.command" "$APP_DIR/scripts/mac/LinkeD"   # anciennes versions
 ok "Fichiers copiés dans $APP_DIR"
 
 # 4. Dépendances ────────────────────────────────────────────
@@ -59,13 +61,6 @@ bold "📦 Installation des dépendances (2-5 min la première fois)…"
 cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund --loglevel=error
 ok "Dépendances installées"
-bold "🖥️  Installation de l'app Mac (≈ 100 Mo la première fois)…"
-if (cd desktop && npm install --no-audit --no-fund --loglevel=error); then
-  ok "App Mac prête"
-else
-  echo "  ⚠️  App Mac indisponible (pas de réseau ?) : LinkeD s'ouvrira dans une fenêtre de navigateur."
-fi
-
 # 5. Configuration (.env) ───────────────────────────────────
 if [ ! -f "$APP_DIR/.env" ]; then
   bold "⚙️  Configuration"
@@ -95,8 +90,15 @@ else
 fi
 chmod 700 "$APP_DIR/data"
 
-# 6. Service en arrière-plan (launchd) + Mac maintenu éveillé (caffeinate) ──
+# 6. App « LinkeD » dans Applications (vraie app Mac) ────────────────────────
+bold "🖥️  Création de l'app LinkeD…"
+APP_PATH="$(bash "$APP_DIR/scripts/mac/make-app.sh" | tail -1)"
+ok "App créée : $APP_PATH (ajoute-la au Dock si tu veux)"
+
+# 7. Service en arrière-plan (launchd) + Mac maintenu éveillé (caffeinate) ──
 bold "🚀 Démarrage automatique"
+SERVICE_BIN="$APP_PATH/Contents/MacOS/linked-service"
+[ -x "$SERVICE_BIN" ] || SERVICE_BIN="$APP_DIR/scripts/mac/linked-service"
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -106,7 +108,7 @@ cat > "$PLIST" <<PLIST
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$APP_DIR/scripts/mac/LinkeD</string>
+    <string>$SERVICE_BIN</string>
   </array>
   <key>WorkingDirectory</key><string>$APP_DIR</string>
   <key>RunAtLoad</key><true/>
@@ -118,6 +120,7 @@ cat > "$PLIST" <<PLIST
     <key>TZ</key><string>Europe/Paris</string>
     <key>LINKED_MANAGED</key><string>1</string>
     <key>LINKED_NODE</key><string>$NODE_BIN</string>
+    <key>LINKED_HOME</key><string>$APP_DIR</string>
     <key>UPDATE_REPO</key><string>$REPO</string>
     <key>UPDATE_BRANCH</key><string>$BRANCH</string>
   </dict>
@@ -129,10 +132,6 @@ PLIST
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 ok "LinkeD tourne en arrière-plan et redémarrera avec le Mac"
-
-# 7. App « LinkeD » dans Applications ────────────────────────
-APP_PATH="$(bash "$APP_DIR/scripts/mac/make-app.sh")"
-ok "App créée : $APP_PATH (ajoute-la au Dock si tu veux)"
 
 printf "  ⏳ Démarrage"
 for _ in $(seq 1 30); do
