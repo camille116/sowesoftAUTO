@@ -29,8 +29,9 @@ export class Settings {
 
   /** Version sans secrets, pour l'affichage. */
   public() {
-    const { auth, telegramToken, ...rest } = this.values;
+    const { auth, telegramToken, relaySecret, ...rest } = this.values;
     rest.hasTelegramToken = Boolean(telegramToken);
+    rest.hasRelaySecret = Boolean(relaySecret);
     const safeAuth = { ...auth };
     for (const f of SECRET_FIELDS) {
       safeAuth[`has${f[0].toUpperCase()}${f.slice(1)}`] = Boolean(auth[f]);
@@ -58,6 +59,12 @@ export class Settings {
       const subjects = 'subjects' in patch.notify ? toList(patch.notify.subjects) : next.notify?.subjects || [];
       next.notify = { mode, subjects: [...new Set(subjects)] };
     }
+    if ('relayUrl' in patch) {
+      const u = String(patch.relayUrl || '').trim();
+      if (u && !/^https:\/\/[\w.-]+\.workers\.dev(\/.*)?$/.test(u) && !/^https:\/\//.test(u)) throw new Error('URL du relais invalide (https://…)');
+      next.relayUrl = u.replace(/\/+$/, '');
+    }
+    if ('relaySecret' in patch) next.relaySecret = String(patch.relaySecret || '').trim();
     if ('memberTemplate' in patch) {
       const t = String(patch.memberTemplate || '').trim();
       if (t.length > 1000) throw new Error('Message trop long (1000 caractères max)');

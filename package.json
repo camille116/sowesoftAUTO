@@ -8,7 +8,8 @@
     "planning": "node src/preview.js",
     "sowesign:login": "node src/sowesign/login.js",
     "test": "node --test \"test/**/*.test.js\"",
-    "demo": "node src/web/demo.js"
+    "demo": "node src/web/demo.js",
+    "relay:deploy": "bash scripts/relay/deploy.sh"
   },
   "repository": {
     "type": "git",

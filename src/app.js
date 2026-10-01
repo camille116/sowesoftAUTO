@@ -24,6 +24,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     channel: config.channel || 'telegram',
     whatsappNumber: config.ownerNumber || '',
     memberTemplate: DEFAULT_MEMBER_TEMPLATE,
+    relayUrl: '', relaySecret: '',
     telegramToken: config.telegram?.token || '',
   });
   const s = settings.get();

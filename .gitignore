@@ -5,3 +5,5 @@ data/
 .wwebjs_auth/
 .wwebjs_cache/
 *.log
+/relay/wrangler.generated.toml
+/relay/.wrangler

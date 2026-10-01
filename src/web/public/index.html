@@ -357,6 +357,25 @@
             <div id="settings-result" class="result" hidden></div>
           </form>
 
+          <!-- Relais cloud -->
+          <article class="card stack" id="relay-card">
+            <div class="section-head">
+              <h3>Relais cloud <span class="tag tag-auto">Mac éteint</span></h3>
+              <p class="muted small">Pour recevoir (toi et la classe) les rappels même quand ton Mac est éteint. LinkeD ne signe jamais à distance.</p>
+            </div>
+            <ol class="steps small">
+              <li>Sur le Mac, dans un Terminal : <code>cd ~/LinkeD &amp;&amp; npm run relay:deploy</code> (compte Cloudflare gratuit, connexion par navigateur)</li>
+              <li>Colle ci-dessous l'URL et la clé affichées à la fin</li>
+            </ol>
+            <label class="field"><span>URL du relais</span><input name="relayUrl" class="mono" placeholder="https://linked-relay.….workers.dev"></label>
+            <label class="field"><span>Clé du relais</span><input name="relaySecret" type="password" class="mono" placeholder="•••••• (inchangée)"></label>
+            <div class="row">
+              <button class="btn btn-primary" type="button" id="relay-save">Activer</button>
+              <button class="btn btn-ghost" type="button" id="relay-test">Tester</button>
+            </div>
+            <div id="relay-result" class="result" hidden></div>
+          </article>
+
           <!-- Application -->
           <article class="card stack" id="app-card">
             <div class="section-head">

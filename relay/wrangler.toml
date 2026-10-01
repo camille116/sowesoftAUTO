@@ -1,0 +1,16 @@
+# Configuration du relais LinkeD sur Cloudflare Workers.
+# Déployé par `npm run relay:deploy` (voir scripts/relay/deploy.sh) : pas besoin d'éditer ce fichier à la main.
+name = "linked-relay"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Base de données (créée automatiquement au déploiement ; l'id est rempli par le script)
+[[d1_databases]]
+binding = "DB"
+database_name = "linked-relay"
+database_id = "PLACEHOLDER"
+
+# Déclencheur : toutes les minutes, le relais vérifie s'il faut envoyer un rappel
+[triggers]
+crons = ["* * * * *"]

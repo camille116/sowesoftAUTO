@@ -504,6 +504,10 @@ async function loadSettings() {
   setNotifyMode(s.notify?.mode || 'auto');
   f.keywords.value = s.keywords.join(', ');
   f.icsUrl.value = s.icsUrl || '';
+  $('#relay-card').querySelector('[name=relayUrl]').value = s.relayUrl || '';
+  const rsec = $('#relay-card').querySelector('[name=relaySecret]');
+  rsec.value = '';
+  rsec.placeholder = s.hasRelaySecret ? '•••••• (inchangée)' : 'Clé affichée par le script';
   setMethod(s.auth.method);
 }
 
@@ -783,6 +787,34 @@ $('#template-save').addEventListener('click', async () => {
 $('#template-reset').addEventListener('click', () => {
   $('#member-template').value = classData.defaultTemplate;
   $('#member-template').dispatchEvent(new Event('input'));
+});
+
+// ── Relais cloud ──────────────────────────────────────────
+const relayInputs = () => ({
+  url: $('#relay-card [name=relayUrl]').value.trim(),
+  secret: $('#relay-card [name=relaySecret]').value.trim(),
+});
+function relayResult(ok, text) {
+  const el = $('#relay-result');
+  el.hidden = false;
+  el.className = `result ${ok ? 'is-ok' : 'is-error'}`;
+  el.textContent = text;
+}
+$('#relay-save').addEventListener('click', async () => {
+  const { url, secret } = relayInputs();
+  try {
+    await api('/api/settings', secret ? { relayUrl: url, relaySecret: secret } : { relayUrl: url });
+    const r = await api('/api/relay/test', { url, secret }).catch((e) => ({ error: e.message }));
+    relayResult(!r.error, r.error ? `Enregistré, mais test échoué : ${r.error}` : 'Relais activé ✓ Les rappels partiront même Mac éteint.');
+    loadSettings();
+  } catch (err) { relayResult(false, err.message); }
+});
+$('#relay-test').addEventListener('click', async () => {
+  const { url, secret } = relayInputs();
+  try {
+    await api('/api/relay/test', { url, secret });
+    relayResult(true, 'Relais joignable ✓');
+  } catch (err) { relayResult(false, err.message); }
 });
 
 // ── App Mac (Electron) : diagnostic et réparation ─────────

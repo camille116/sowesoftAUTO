@@ -5,6 +5,7 @@ import { createWhatsApp } from './whatsapp.js';
 import { createWebServer } from './web/server.js';
 import { createUpdater } from './updater.js';
 import { createDesktop } from './desktop.js';
+import { createRelayClient } from './relay-client.js';
 import { msg } from './messages.js';
 import { log } from './logger.js';
 
@@ -95,6 +96,11 @@ const desktop = createDesktop({ root: config.root, dataDir: config.dataDir, mana
 createWebServer({ app, channels, updater, desktop, password, dataDir: config.dataDir }).listen(port, host, () => {
   log.info(`LinkeD : http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
 });
+
+// Relais cloud : pousse l'état vers Cloudflare pour les rappels quand le Mac est éteint
+const relay = createRelayClient({ settings: app.settings, store: app.store, members: app.members, telegram });
+relay.start();
+app.relay = relay;
 
 const s = app.settings.get();
 log.info(`Démarrage de LinkeD – messagerie : ${s.channel}, rappels à ${s.reminderOffsets.join(', ')} min, mode test : ${s.dryRun}`);
