@@ -30,7 +30,7 @@ export const config = {
 
   planning: {
     icsUrl: env.ICS_URL || '',
-    keywords: list(env.AUTONOMY_KEYWORDS, ['autonomie', 'autonome']),
+    keywords: list(env.AUTONOMY_KEYWORDS, ['autonomie', 'autonome', 'elearning', 'e-learning']),
     manual: readJson(env.PLANNING_FILE || 'config/planning.json', { weekly: [], dates: [] }),
   },
 

@@ -58,7 +58,7 @@ Dans les deux cas, renseigne **ton** numéro dans `OWNER_NUMBER` : le bot ignore
 ### 1. Le planning (`.env` + `config/planning.json`)
 
 **Option A – agenda de l'école (recommandé).** La plupart des outils d'emploi du temps (Hyperplanning, Ypareo, Aurion, Google Agenda, Outlook…) proposent un lien d'export **ICS / iCal**. Colle-le dans `ICS_URL`.
-Les créneaux sont retenus si leur titre, description ou lieu contient un des `AUTONOMY_KEYWORDS` (`autonomie,autonome,travail personnel…`).
+Les créneaux sont retenus si leur titre, description ou lieu contient un des `AUTONOMY_KEYWORDS` (`autonomie,autonome,travail personnel,elearning…`).
 
 **Option B – planning manuel.** Édite `config/planning.json` :
 
