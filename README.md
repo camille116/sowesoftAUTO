@@ -4,13 +4,13 @@
 
 1. **lit ton planning** (agenda ICS de l'école et/ou planning manuel) et repère tes **heures d'autonomie** ;
 2. **t'envoie un message quand tu dois signer** sur Sowesoft / SoWeSign, et te relance tant que ce n'est pas fait ;
-3. **signe à ta place** quand tu lui envoies le code de signature (`4821`), puis te renvoie une capture d'écran comme preuve.
+3. **signe à ta place** quand tu lui envoies le code de cours à 5 chiffres (`48213`), puis te renvoie une capture d'écran comme preuve.
 
 > Le dossier de cadrage du projet (persona, parcours, ton de marque, architecture, roadmap) est dans [`docs/CADRAGE.md`](docs/CADRAGE.md).
 
 ```
  Agenda ICS ─┐                       ┌──────────────┐
-             ├─► Planning ─► Rappels ─►│  WhatsApp    │◄── toi : « 4821 »
+             ├─► Planning ─► Rappels ─►│  WhatsApp    │◄── toi : « 48213 »
  planning.json┘                       └──────┬───────┘
                                              ▼
                                   Robot navigateur (Chromium)
@@ -80,33 +80,31 @@ npm run planning
 
 `REMINDER_OFFSETS=-5,0,15,45` → un message 5 min avant, au début, puis 15 et 45 min après si tu n'as toujours pas signé. Les rappels s'arrêtent dès que c'est signé (par le bot ou toi avec « fait »).
 
-### 3. La signature automatique (`config/sowesign.json`)
+### 3. La signature automatique (SoWeSoft – app.sowesign.com)
 
-Le robot ouvre la plateforme dans un Chromium invisible, se connecte avec `SOWESIGN_LOGIN` / `SOWESIGN_PASSWORD`, tape le code (il gère aussi les codes en cases séparées) et valide.
+Le robot reproduit exactement ce que tu fais sur ton téléphone, dans un Chromium invisible :
 
-Chaque école a une interface un peu différente, donc **les sélecteurs sont à vérifier une fois** :
+1. **Connexion** sur `app.sowesign.com/login` : code établissement **7705** (OMNES), puis ta méthode de connexion ;
+2. **Espace étudiant** : il ferme la fenêtre « Informations légales » si elle s'affiche ;
+3. **Code à 5 chiffres** tapé dans les cases du cours en cours ;
+4. **Pad de signature** (si ton école l'exige) : il dessine une signature qui occupe le cadre et valide ;
+5. **Vérification** : il attend « Votre présence a bien été enregistrée » et t'envoie la capture.
 
-```bash
-HEADLESS=false npm run sowesign:inspect
-```
+Choisis ta méthode de connexion dans `.env` :
 
-1. Un navigateur s'ouvre : connecte-toi et va jusqu'à l'écran où tu tapes le code.
-2. Appuie sur **Entrée** dans le terminal : le script liste les champs/boutons avec leur sélecteur CSS.
-3. Reporte-les dans `config/sowesign.json` :
+| `SOWESIGN_LOGIN_METHOD` | À remplir | Automatique ? |
+|---|---|---|
+| `password` (par défaut) | `SOWESIGN_EMAIL`, `SOWESIGN_PASSWORD` | ✅ oui |
+| `code` | `SOWESIGN_ID` (8 chiffres), `SOWESIGN_PIN` (4 chiffres) | ✅ oui |
+| `sso` (Microsoft OMNES) | rien : lance `npm run sowesign:login` et connecte-toi à la main | ⚠️ à refaire quand la session expire (~25 jours) |
 
-| Clé | Rôle |
-|---|---|
-| `url` | Page d'accueil / de connexion |
-| `signUrl` | (optionnel) URL directe de la page de signature |
-| `selectors.username` / `password` / `loginSubmit` | Formulaire de connexion |
-| `selectors.openSignature` | (optionnel) bouton à cliquer pour faire apparaître le champ code |
-| `selectors.codeInput` / `codeSubmit` | Champ(s) du code et bouton de validation |
-| `selectors.loggedIn` | (optionnel) élément visible seulement une fois connecté |
-| `successTexts` / `errorTexts` | Textes qui confirment ou refusent la signature |
+La session SoWeSoft est gardée dans `data/sowesign-profile/` (~25 jours) : le bot ne se reconnecte que lorsqu'elle a expiré.
 
-> 🔐 Si ton école se connecte via un SSO (Microsoft, Google…), le plus simple est de te connecter une fois avec `sowesign:inspect` : le bot réutilise ensuite la session enregistrée dans `data/sowesign-profile/`.
+> 🔒 **Anti-blocage** : SoWeSoft bloque le compte après 3 connexions ratées. Si une connexion échoue, le bot **ne réessaie plus tout seul** et te prévient. Corrige `.env`, puis envoie *test* pour le débloquer.
 
-**Mode test** : laisse `SIGN_DRY_RUN=true` au début. Le bot remplit le code **sans valider** et t'envoie la capture. Quand la capture est bonne, passe à `false`.
+**Mode test** : laisse `SIGN_DRY_RUN=true` au début. Le bot fait tout le parcours mais tape seulement les **4 premiers chiffres** (rien n'est envoyé à SoWeSoft tant que le 5e n'est pas saisi) et t'envoie la capture. Quand c'est bon, passe à `false`.
+
+Les sélecteurs de l'interface sont dans `config/sowesign.json` : à toucher seulement si SoWeSoft change son application.
 
 ---
 
@@ -114,13 +112,13 @@ HEADLESS=false npm run sowesign:inspect
 
 | Tu envoies | Émile fait |
 |---|---|
-| `4821` · `code 4821` · `signe 4821` | Signe avec ce code et renvoie une capture ✅ |
+| `48213` · `code 48213` · `signe 48213` | Signe avec ce code et renvoie une capture ✅ |
 | `fait` · `signé` | Note que tu as signé toi-même, arrête les rappels |
 | `ignore` | Ignore le créneau en cours (cours annulé…) |
 | `planning` · `demain` · `semaine` | Liste tes créneaux d'autonomie (✅ / ⬜) |
 | `statut` | Rappels actifs ?, créneau en cours, prochain créneau |
 | `pause` · `reprendre` | Coupe / relance les rappels (vacances) |
-| `test` | Vérifie la connexion à Sowesoft (capture) |
+| `test` | Vérifie la connexion à SoWeSoft (capture) et la débloque après une erreur |
 | `aide` | Rappelle les commandes |
 
 Exemple :
@@ -130,9 +128,9 @@ Exemple :
 13:30–17:00 · Autonomie – projet
 👉 Envoie-moi le code et je signe, ou réponds fait si c'est déjà fait.
 
-toi : 4821
+toi : 48213
 
-🤖 Je signe avec le code 4821… ⏳
+🤖 Je signe avec le code 48213… ⏳
 🤖 ✅ Signé !  [capture d'écran]
 ```
 
@@ -141,10 +139,10 @@ toi : 4821
 ## 🧪 Développement
 
 ```bash
-npm test     # 22 tests : commandes, planning ICS/manuel, rappels, bot, et signature réelle dans Chromium
+npm test     # 26 tests : commandes, planning ICS/manuel, rappels, bot, et parcours SoWeSoft complet dans Chromium
 ```
 
-Le test de signature lance un vrai Chromium contre une fausse plateforme (`test/fixtures/mock-sowesign.js`). Définis `CHROME_PATH` si Chromium n'est pas trouvé ; sinon ce test est ignoré.
+Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui reproduit la structure de la vraie (`test/fixtures/mock-sowesign.js`). Définis `CHROME_PATH` si Chromium n'est pas trouvé ; sinon ce test est ignoré.
 
 ```
 src/
@@ -156,7 +154,7 @@ src/
 ├── reminders.js        calcul des rappels
 ├── store.js            état persistant (data/state.json)
 ├── planning/           agenda ICS + planning manuel
-└── sowesign/           robot de signature + outil de repérage
+└── sowesign/           robot de signature SoWeSoft + connexion manuelle
 ```
 
 ---

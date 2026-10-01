@@ -11,17 +11,17 @@ const slot = (s) => `${fmtTime(s.start)}–${fmtTime(s.end)} · ${s.title}`;
 
 export const msg = {
   welcome: () =>
-    `${BOT_TAG} *Émile est en ligne* ✍️\nJe te préviens quand tu dois signer pendant tes heures d'autonomie.\nEnvoie-moi le code de signature et je signe pour toi.\n\nTape *aide* pour voir ce que je sais faire.`,
+    `${BOT_TAG} *Émile est en ligne* ✍️\nJe te préviens quand tu dois signer pendant tes heures d'autonomie.\nEnvoie-moi le code à 5 chiffres et je signe pour toi.\n\nTape *aide* pour voir ce que je sais faire.`,
 
   help: (dryRun) =>
     `${BOT_TAG} *Ce que je comprends :*\n` +
-    `• *4821* ou *code 4821* → je signe avec ce code\n` +
+    `• *48213* ou *code 48213* → je signe avec ce code\n` +
     `• *fait* → tu as signé toi-même, j'arrête de te relancer\n` +
     `• *ignore* → pas besoin de signer ce créneau\n` +
     `• *planning* / *demain* / *semaine* → tes créneaux d'autonomie\n` +
     `• *statut* → où on en est\n` +
     `• *pause* / *reprendre* → couper / relancer les rappels\n` +
-    `• *test* → je vérifie la connexion à Sowesoft` +
+    `• *test* → je vérifie la connexion à SoWeSoft (et je la débloque après une erreur)` +
     (dryRun ? `\n\n🧪 _Mode test actif : je remplis le code mais je ne valide pas._` : ''),
 
   reminder: ({ session, offset, isLast }) => {
@@ -36,7 +36,8 @@ export const msg = {
   signing: (code) => `${BOT_TAG} Je signe avec le code *${code}*… ⏳`,
   signed: (session) => `${BOT_TAG} ✅ *Signé !*${session ? `\n${slot(session)}` : ''}`,
   dryRun: (code) =>
-    `${BOT_TAG} 🧪 Mode test : j'ai saisi *${code}* sans valider. Regarde la capture. Passe SIGN_DRY_RUN=false quand tout est bon.`,
+    `${BOT_TAG} 🧪 Mode test : j'ai tapé *${code.slice(0, -1)}* et je me suis arrêté avant le dernier chiffre. Regarde la capture, puis passe SIGN_DRY_RUN=false quand tout est bon.`,
+  alreadySigned: (session) => `${BOT_TAG} ✅ SoWeSoft indique que c'est *déjà signé*.${session ? `\n${slot(session)}` : ''}`,
   signFailed: (reason) =>
     `${BOT_TAG} ❌ Je n'ai pas réussi à signer : ${reason}\n👉 Signe à la main sur l'appli, puis réponds *fait*. Tu peux aussi me renvoyer le code.`,
   signBusy: () => `${BOT_TAG} ⏳ Je suis déjà en train de signer, une seconde…`,
@@ -80,5 +81,5 @@ export const msg = {
   testing: () => `${BOT_TAG} 🔌 Je teste la connexion à Sowesoft…`,
   testOk: () => `${BOT_TAG} ✅ Connexion à Sowesoft OK (capture ci-jointe).`,
   testFailed: (reason) => `${BOT_TAG} ❌ Connexion à Sowesoft impossible : ${reason}`,
-  unknown: () => `${BOT_TAG} Je n'ai pas compris 🤔 Envoie un *code* (ex : 4821) ou tape *aide*.`,
+  unknown: () => `${BOT_TAG} Je n'ai pas compris 🤔 Envoie un *code* (ex : 48213) ou tape *aide*.`,
 };

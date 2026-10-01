@@ -1,7 +1,7 @@
 /**
  * Transforme un message WhatsApp libre en commande.
  * Le bot doit comprendre un message tapé vite, entre deux cours :
- * « 4821 », « code 4821 », « signe 4821 », « c'est fait », « planning »…
+ * « 48213 », « code 48213 », « signe 48213 », « c'est fait », « planning »…
  */
 const CODE = /^[a-z0-9]{3,8}$/i;
 
@@ -32,7 +32,7 @@ export function parseCommand(raw) {
   const text = clean(raw);
   if (!text) return { type: 'unknown' };
 
-  // « code 4821 », « signe 4821 », « signer : 4821 », « sign 4821 »
+  // « code 48213 », « signe 48213 », « signer : 48213 », « sign 48213 »
   const withPrefix = text.match(/^(?:code|signe|signer|sign|emarge|émarge)\s*[:=-]?\s*([a-z0-9 ]{3,12})$/i);
   if (withPrefix) {
     const code = withPrefix[1].replace(/\s/g, '');

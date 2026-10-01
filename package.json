@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "planning": "node src/preview.js",
-    "sowesign:inspect": "node src/sowesign/inspect.js",
+    "sowesign:login": "node src/sowesign/login.js",
     "test": "node --test \"test/**/*.test.js\""
   },
   "repository": {

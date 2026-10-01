@@ -1,53 +1,119 @@
 import { createServer } from 'node:http';
 
 /**
- * Fausse plateforme d'émargement pour tester le robot de signature de bout en bout :
- * page de login → page avec un code en 4 cases → message de succès / d'erreur.
+ * Fausse appli SoWeSoft qui reproduit la structure de la vraie (relevée sur app.sowesign.com) :
+ *  /login    : « Continuer » → code établissement au clavier → choix de méthode (div.mode)
+ *              → e-mail + mot de passe → redirection vers /student/
+ *  /student/ : popup « FERMER » → app-code-detection (5 cases, écoute keyup) → pad de signature
+ *              → « Votre présence a bien été enregistrée »
  */
-const page = (body) => `<!doctype html><html lang="fr"><meta charset="utf-8"><body>${body}</body></html>`;
+const html = (body, script = '') =>
+  `<!doctype html><html lang="fr"><meta charset="utf-8"><body>${body}<script>${script}</script></body></html>`;
 
-export function startMockSowesign({ validCode = '4821', login = 'eleve@ecole.fr', password = 'secret' } = {}) {
+const portal = (institution) => html(
+  `<div id="root"><app-button class="button-continue"><div style="cursor:pointer">Continuer</div></app-button></div>`,
+  `
+  const root = document.getElementById('root');
+  let digits = '';
+  document.querySelector('app-button').addEventListener('click', () => {
+    root.innerHTML = '<p>Saisissez votre code d’établissement</p><app-input-boxes></app-input-boxes>';
+    window.addEventListener('keyup', onKey);
+  });
+  function onKey(e) {
+    if (!/^[0-9]$/.test(e.key)) return;
+    digits += e.key;
+    if (digits.length < 4) return;
+    window.removeEventListener('keyup', onKey);
+    if (digits !== '${institution}') { location.href = '/error?m=institution'; return; }
+    root.innerHTML = '<p>Choisissez une méthode d’authentification</p>' +
+      ['Code d’identification', 'Identifiants internes', 'Mot de passe'].map((t, i) =>
+        '<div class="mode"><div class="text-l" style="cursor:pointer" data-i="' + i + '">' + t + '</div></div>').join('');
+    root.querySelectorAll('[data-i="2"]').forEach((el) => el.addEventListener('click', passwordForm));
+  }
+  function passwordForm() {
+    root.innerHTML = '<input id="email" type="text"><input id="password" type="password">' +
+      '<app-button><div id="go" style="cursor:pointer">Valider</div></app-button>';
+    document.getElementById('go').addEventListener('click', async () => {
+      const res = await fetch('/api/login', { method: 'POST', body: JSON.stringify({
+        email: document.getElementById('email').value, password: document.getElementById('password').value }) });
+      location.href = res.ok ? '/student/' : '/error?m=password';
+    });
+  }`,
+);
+
+const student = html(
+  `<app-root>
+    <app-popup id="popup"><div class="modal"><div>INFORMATIONS LÉGALES</div>
+      <div class="footer uppercase"><div class="cursor-pointer" id="close" style="cursor:pointer">FERMER</div></div></div></app-popup>
+    <app-detection><p>Saisissez le code à 5 chiffres</p>
+      <app-code-detection id="zone"><div id="boxes">${'<div class="box"><span>0</span></div>'.repeat(5)}</div><div id="err"></div></app-code-detection>
+    </app-detection>
+  </app-root>`,
+  `
+  if (localStorage.getItem('rgpd')) document.getElementById('popup').remove();
+  document.getElementById('close')?.addEventListener('click', () => { localStorage.setItem('rgpd', '1'); document.getElementById('popup').remove(); });
+  let code = '';
+  const zone = document.getElementById('zone');
+  const render = () => zone.querySelectorAll('.box span').forEach((s, i) => (s.textContent = code[i] || '0'));
+  zone.addEventListener('keyup', async (e) => {
+    if (e.key === 'Backspace') { code = code.slice(0, -1); return render(); }
+    if (!/^[0-9]$/.test(e.key) || code.length >= 5) return;
+    code += e.key; render();
+    if (code.length < 5) return;
+    const res = await fetch('/api/checkcode', { method: 'POST', body: code });
+    if (!res.ok) { document.getElementById('err').innerHTML = '<div class="red">Code invalide</div>'; code = ''; return; }
+    showPad();
+  });
+  function showPad() {
+    document.querySelector('app-detection').outerHTML =
+      '<app-signature><app-signature-component><signature-pad><canvas width="360" height="200" style="width:360px;height:200px;border:1px solid #ccc"></canvas></signature-pad>' +
+      '<div class="text cursor-pointer" id="validate" style="cursor:pointer">Valider</div></app-signature-component></app-signature>';
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false, minX = 1e9, maxX = -1;
+    canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+    canvas.addEventListener('mousemove', (e) => { if (!drawing) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); minX = Math.min(minX, e.offsetX); maxX = Math.max(maxX, e.offsetX); });
+    window.addEventListener('mouseup', () => (drawing = false));
+    document.getElementById('validate').addEventListener('click', async () => {
+      if (maxX - minX < canvas.width * 0.5) {
+        document.body.insertAdjacentHTML('beforeend', '<app-toast>Erreur : votre signature est trop petite</app-toast>');
+        return;
+      }
+      await fetch('/api/sign', { method: 'POST', body: code });
+      document.querySelector('app-signature').outerHTML = '<app-validated>Votre présence a bien été enregistrée à 14:02</app-validated>';
+    });
+  }`,
+);
+
+export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret' } = {}) {
   const signatures = [];
+  const logins = [];
   const server = createServer((req, res) => {
     const logged = (req.headers.cookie || '').includes('sid=ok');
     const url = new URL(req.url, 'http://x');
-    let data = '';
-    req.on('data', (c) => (data += c));
+    let body = '';
+    req.on('data', (c) => (body += c));
     req.on('end', () => {
-      const form = new URLSearchParams(data);
-      if (req.method === 'POST' && url.pathname === '/login') {
-        if (form.get('email') === login && form.get('password') === password) {
-          res.writeHead(302, { 'set-cookie': 'sid=ok; Path=/', location: '/' });
-        } else {
-          res.writeHead(302, { location: '/?bad=1' });
-        }
-        return res.end();
+      const send = (status, content, headers = {}) => { res.writeHead(status, { 'content-type': 'text/html', ...headers }); res.end(content); };
+      if (url.pathname === '/api/login') {
+        const creds = JSON.parse(body);
+        logins.push(creds.email);
+        return creds.email === email && creds.password === password
+          ? send(200, '{}', { 'set-cookie': 'sid=ok; Path=/; Max-Age=3600' })
+          : send(400, '{}');
       }
-      if (!logged) {
-        res.writeHead(200, { 'content-type': 'text/html' });
-        return res.end(page(`<form method="post" action="/login">
-          ${url.searchParams.has('bad') ? '<p>Identifiants invalides</p>' : ''}
-          <input type="email" name="email"><input type="password" name="password">
-          <button type="submit">Connexion</button></form>`));
-      }
-      if (req.method === 'POST' && url.pathname === '/sign') {
-        const code = ['d1', 'd2', 'd3', 'd4'].map((k) => form.get(k) || '').join('');
-        signatures.push(code);
-        res.writeHead(200, { 'content-type': 'text/html' });
-        return res.end(page(code === validCode
-          ? '<h1>Signature enregistrée ✅</h1>'
-          : '<h1>Code incorrect</h1>'));
-      }
-      res.writeHead(200, { 'content-type': 'text/html' });
-      res.end(page(`<h2 id="hello">Bonjour Camille</h2><p>Mes émargements : 3 signés</p>
-        <form method="post" action="/sign">
-          ${[1, 2, 3, 4].map((i) => `<input name="d${i}" maxlength="1" inputmode="numeric">`).join('')}
-          <button type="submit">Valider</button></form>`));
+      if (url.pathname === '/api/checkcode') return send(body === validCode ? 200 : 400, '{}');
+      if (url.pathname === '/api/sign') { signatures.push(body); return send(200, '{}'); }
+      if (url.pathname === '/login') return send(200, portal(institution));
+      if (url.pathname === '/error') return send(200, html('<h1>Erreur d’authentification</h1><p>L’adresse e-mail et/ou le mot de passe sont incorrects</p>'));
+      if (url.pathname.startsWith('/student')) return logged ? send(200, student) : send(302, '', { location: '/login' });
+      send(404, 'not found');
     });
   });
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
-      resolve({ url: `http://127.0.0.1:${server.address().port}/`, signatures, close: () => server.close() });
+      const base = `http://127.0.0.1:${server.address().port}`;
+      resolve({ base, signatures, logins, close: () => server.close() });
     });
   });
 }

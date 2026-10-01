@@ -63,7 +63,7 @@ _Assistant WhatsApp d'émargement Sowesoft / SoWeSign_
    AVANT                    PENDANT                         APRÈS
  ┌──────────┐   T-5 min  ┌────────────────┐  code    ┌───────────────┐
  │ Planning │──────────►│ ⏰ « Dans 5 min │────────►│ ✅ « Signé ! » │
- │ détecté  │  T0        │  autonomie »   │  « 4821 »│  + capture    │
+ │ détecté  │  T0        │  autonomie »   │ « 48213 »│  + capture    │
  └──────────┘──────────►│ ✍️ « C'est      │          └───────────────┘
                          │  l'heure »     │  « fait » ┌───────────────┐
                          │ 🔔 T+15        │────────►│ 👍 « Noté »    │
@@ -82,7 +82,7 @@ _Assistant WhatsApp d'émargement Sowesoft / SoWeSign_
 
 ### Principes
 1. **Une action par message.** Chaque rappel finit par une seule consigne claire : « envoie le code ».
-2. **Zéro syntaxe à apprendre.** `4821`, `code 4821`, `signe 4821`, `48 21` marchent tous.
+2. **Zéro syntaxe à apprendre.** `48213`, `code 48213`, `signe 48213`, `482 13` marchent tous.
 3. **Toujours une porte de sortie.** En cas d'échec : la raison + quoi faire (« signe à la main puis réponds *fait* »).
 4. **Pas de spam.** Après une coupure, le bot n'envoie que le dernier rappel dû, pas tous ceux qu'il a ratés.
 5. **Preuve visuelle.** Chaque signature est accompagnée d'une capture.
@@ -156,7 +156,7 @@ Le **cerveau** (`src/bot.js`) ne dépend pas de WhatsApp : on pourra brancher Te
 | Phase | Contenu | Statut |
 |---|---|---|
 | **S1 – MVP** | Planning ICS + manuel, rappels progressifs, signature par code, mode test, captures, Docker | ✅ livré |
-| **S2 – Calibrage** | Sélecteurs réels de l'école via `sowesign:inspect`, test en mode test sur 1 semaine, passage en réel | ⏳ à faire avec Camille |
+| **S2 – Calibrage** | Parcours réel SoWeSoft OMNES relevé et testé (connexion, popup, saisie du code) ; 1 semaine en mode test puis passage en réel | 🟡 en cours |
 | **S3 – Confort** | Récap du soir (« 2/2 signés aujourd'hui »), alerte si la session Sowesoft expire, code reçu par mail lu automatiquement (connecteur Gmail) | 💡 |
 | **S4 – Promo** | Multi-utilisateurs, API WhatsApp Business officielle, mini-dashboard d'assiduité | 💡 (avec accord de l'école) |
 
@@ -188,7 +188,7 @@ _R = réalise · A = valide · C = consulté · I = informé_
 | Risque | Probabilité | Parade |
 |---|---|---|
 | Sowesoft change son interface | Moyenne | Sélecteurs en config + capture d'erreur envoyée sur WhatsApp |
-| Connexion SSO / double authentification | Moyenne | Session mémorisée via `sowesign:inspect` |
+| Connexion SSO / double authentification | Moyenne | Connexion e-mail + mot de passe automatique, ou session mémorisée via `sowesign:login` ; pas de 2e essai après un échec (anti-blocage) |
 | WhatsApp déconnecte la session Web | Faible | Reconnexion auto ; sinon re-scanner le QR |
 | Règlement de l'école défavorable | À vérifier | Garder le mode rappel seul (`SIGN_DRY_RUN=true`) |
 | Machine éteinte | Moyenne | Raspberry Pi / VPS + `restart: unless-stopped` |

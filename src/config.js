@@ -21,6 +21,7 @@ function readJson(path, fallback) {
 }
 
 const env = process.env;
+const site = readJson(env.SOWESIGN_CONFIG || 'config/sowesign.json', {});
 
 export const config = {
   root: ROOT,
@@ -40,10 +41,17 @@ export const config = {
   },
 
   sowesign: {
-    login: env.SOWESIGN_LOGIN || '',
-    password: env.SOWESIGN_PASSWORD || '',
+    site,
+    auth: {
+      // code = identifiant 8 chiffres + PIN · password = e-mail + mot de passe · sso = connexion manuelle
+      method: (env.SOWESIGN_LOGIN_METHOD || 'password').toLowerCase(),
+      institution: env.SOWESIGN_INSTITUTION || site.institutionCode || '',
+      id: env.SOWESIGN_ID || '',
+      pin: env.SOWESIGN_PIN || '',
+      email: env.SOWESIGN_EMAIL || '',
+      password: env.SOWESIGN_PASSWORD || '',
+    },
     dryRun: bool(env.SIGN_DRY_RUN, true),
-    site: readJson(env.SOWESIGN_CONFIG || 'config/sowesign.json', {}),
   },
 
   browser: {

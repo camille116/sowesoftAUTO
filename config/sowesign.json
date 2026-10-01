@@ -1,17 +1,40 @@
 {
-  "_aide": "URLs et sélecteurs CSS de la plateforme d'émargement. Valeurs par défaut génériques : vérifie-les avec `npm run sowesign:inspect` (voir README). Plusieurs sélecteurs peuvent être séparés par des virgules.",
-  "url": "https://app.sowesign.com/",
-  "signUrl": "",
+  "_aide": "Paramètres de l'application SoWeSoft (app.sowesign.com). Relevés sur la vraie application en octobre 2026 : à ajuster seulement si SoWeSoft change son interface.",
+  "institutionCode": "7705",
+  "portalUrl": "https://app.sowesign.com/login",
+  "studentUrl": "https://app.sowesign.com/student/",
+  "codeLength": 5,
   "selectors": {
-    "username": "input[type=email], input[name=email], input[name=username], input[name=login], #username",
-    "password": "input[type=password]",
-    "loginSubmit": "button[type=submit], input[type=submit]",
-    "loggedIn": "",
-    "openSignature": "",
-    "codeInput": "input[autocomplete=one-time-code], input[name*=code i], input[id*=code i], input[inputmode=numeric]",
-    "codeSubmit": "button[type=submit], input[type=submit]"
+    "continue": "app-button.button-continue",
+    "loginMode": "div.mode",
+    "email": "#email",
+    "password": "#password",
+    "keypadKey": "app-keyboard .key",
+    "codeZone": "app-code-detection",
+    "codeBoxes": "app-code-detection .box",
+    "codeError": "app-code-detection .red",
+    "signatureCanvas": "app-signature-component canvas",
+    "signatureValidate": "app-signature-component .cursor-pointer",
+    "toast": "app-toast",
+    "popup": "app-popup, app-doc-popup, .popup, ion-modal"
   },
-  "successTexts": ["signature enregistrée", "émargement enregistré", "présence enregistrée", "merci", "signé"],
-  "errorTexts": ["code incorrect", "code invalide", "code expiré", "erreur", "invalid"],
-  "timeoutMs": 20000
+  "pages": {
+    "detection": "app-code-detection, app-keyboard",
+    "signature": "app-signature-component",
+    "validated": "app-validated",
+    "noCourse": "app-no-course",
+    "nextCourse": "app-next-course",
+    "wrongTime": "app-wrong-time",
+    "accessDenied": "app-access-denied"
+  },
+  "texts": {
+    "modeCode": ["code d’identification", "code d'identification", "identification code"],
+    "modePassword": ["mot de passe", "password"],
+    "validate": ["valider", "validate"],
+    "closePopup": ["fermer", "close"],
+    "presenceRegistered": ["présence a bien été enregistrée", "presence has been registered"],
+    "signatureExpired": ["période de signature a expiré", "signature period has expired", "n'autorise plus la signature"],
+    "loginErrors": ["code est invalide", "code is invalid", "tentative de connexion erronée", "incorrect login attempt", "mot de passe sont incorrects", "password are incorrect"]
+  },
+  "timeoutMs": 25000
 }

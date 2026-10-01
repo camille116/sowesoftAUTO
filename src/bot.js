@@ -75,7 +75,7 @@ export class Bot {
     // signature OK : on la rattache au créneau en cours, s'il y en a un
     const current = await this.planning.current(now);
     if (current) this.store.markSigned(current.id, 'bot');
-    return this.send(msg.signed(current), result.screenshot);
+    return this.send(result.already ? msg.alreadySigned(current) : msg.signed(current), result.screenshot);
   }
 
   async status(now) {
