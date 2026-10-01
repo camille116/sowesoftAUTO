@@ -361,3 +361,54 @@ code { background: var(--surface-3); border: 1px solid var(--border); padding: .
 .mini-list .empty { padding: 12px 0; text-align: left; display: block; }
 #today-card a { text-decoration: none; }
 #today-card a:hover { color: var(--text); }
+
+/* ── Classe ─────────────────────────────── */
+.kpi-inline { font-size: .85rem; color: var(--text-2); padding: 6px 12px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); }
+.member-form { grid-template-columns: 1fr 1fr auto; align-items: end; }
+@media (max-width: 560px) { .member-form { grid-template-columns: 1fr; } }
+.share-box { display: grid; gap: 10px; justify-items: start; }
+.share-box p { white-space: pre-line; color: var(--text-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  appearance: none; cursor: pointer; font: 600 .75rem var(--mono); padding: 4px 8px; border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); color: var(--text);
+}
+.chip:hover { border-color: var(--accent); }
+.textarea {
+  width: 100%; resize: vertical; min-height: 120px; font: 400 .88rem/1.5 var(--mono); color: var(--text); background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;
+}
+.textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.preview { display: grid; gap: 8px; padding: 14px; border-radius: var(--radius-sm); background: linear-gradient(160deg, #17212b, #0e1621); border: 1px solid var(--border); }
+.bubble {
+  justify-self: start; max-width: 92%; background: #182533; color: #e9eef3; border-radius: 14px 14px 14px 4px;
+  padding: 9px 12px; font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 1px 1px rgb(0 0 0 / 30%);
+}
+.bubble b { font-weight: 700; }
+.bubble i { font-style: italic; }
+.table-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.input-sm { max-width: 220px; min-height: 34px; padding: 6px 10px; font-size: .85rem; }
+.member-list { list-style: none; margin: 0; padding: 0; }
+.member-list li { display: grid; grid-template-columns: 36px minmax(0, 1.2fr) minmax(0, 1fr) 290px; gap: 14px; align-items: center; padding: 12px 20px; }
+.member-list li + li { border-top: 1px solid var(--border); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .85rem; color: #fff; background: var(--grad); }
+.member-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-sub { font-size: .78rem; color: var(--muted); font-family: var(--mono); }
+.member-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.status-invited { background: var(--surface-3); color: var(--text-2); }
+.status-active { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.status-paused { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.chip-btn.danger:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+@media (max-width: 760px) {
+  .member-list li { grid-template-columns: 36px 1fr; }
+  .member-list li > :nth-child(3), .member-actions { grid-column: 2; justify-content: flex-start; }
+}
+
+/* ── App Mac (Electron) : barre de titre intégrée ── */
+[data-shell="desktop"] .sidebar { padding-top: 46px; -webkit-app-region: drag; }
+[data-shell="desktop"] .sidebar a, [data-shell="desktop"] .sidebar button { -webkit-app-region: no-drag; }
+[data-shell="desktop"] .page-head { -webkit-app-region: drag; }
+[data-shell="desktop"] .page-head button, [data-shell="desktop"] .page-head a, [data-shell="desktop"] .page-head input,
+[data-shell="desktop"] .page-head .segmented { -webkit-app-region: no-drag; }
+[data-shell="desktop"] .login::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 40px; -webkit-app-region: drag; }
+[data-shell="desktop"] body::before { display: none; }

@@ -59,6 +59,12 @@ bold "📦 Installation des dépendances (2-5 min la première fois)…"
 cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund --loglevel=error
 ok "Dépendances installées"
+bold "🖥️  Installation de l'app Mac (≈ 100 Mo la première fois)…"
+if (cd desktop && npm install --no-audit --no-fund --loglevel=error); then
+  ok "App Mac prête"
+else
+  echo "  ⚠️  App Mac indisponible (pas de réseau ?) : LinkeD s'ouvrira dans une fenêtre de navigateur."
+fi
 
 # 5. Configuration (.env) ───────────────────────────────────
 if [ ! -f "$APP_DIR/.env" ]; then
@@ -100,10 +106,7 @@ cat > "$PLIST" <<PLIST
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/caffeinate</string>
-    <string>-i</string>
-    <string>$NODE_BIN</string>
-    <string>src/index.js</string>
+    <string>$APP_DIR/scripts/mac/LinkeD</string>
   </array>
   <key>WorkingDirectory</key><string>$APP_DIR</string>
   <key>RunAtLoad</key><true/>
@@ -114,6 +117,7 @@ cat > "$PLIST" <<PLIST
     <key>PATH</key><string>$(dirname "$NODE_BIN"):/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>TZ</key><string>Europe/Paris</string>
     <key>LINKED_MANAGED</key><string>1</string>
+    <key>LINKED_NODE</key><string>$NODE_BIN</string>
     <key>UPDATE_REPO</key><string>$REPO</string>
     <key>UPDATE_BRANCH</key><string>$BRANCH</string>
   </dict>

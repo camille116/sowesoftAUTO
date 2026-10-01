@@ -1,6 +1,6 @@
 # Installer LinkeD sur ton Mac
 
-Environ 10 minutes, **sans Terminal**. Ensuite, LinkeD s'ouvre comme une app normale (Applications, Launchpad, Spotlight, Dock) et se met à jour avec un bouton.
+Environ 10 minutes, **sans Terminal**. Ensuite, LinkeD est une **vraie app Mac**, comme Spotify : sa propre fenêtre, son icône dans le Dock, ses menus. Elle s'ouvre depuis Applications, le Launchpad ou Spotlight, et se met à jour avec un bouton.
 
 ## 1. Installer Node.js (une seule fois)
 
@@ -24,7 +24,7 @@ Une fenêtre s'ouvre et fait tout toute seule (2 à 5 minutes) :
 - elle installe LinkeD dans le dossier `~/LinkeD` (tes réglages d'Émile sont récupérés si tu l'avais installé) ;
 - elle te demande, dans des petites fenêtres, **un mot de passe pour l'app** et ton **lien iCal Hyperplanning** (tu peux le mettre plus tard) ;
 - elle lance LinkeD en arrière-plan, avec redémarrage automatique à chaque allumage du Mac ;
-- elle crée l'app **LinkeD** dans ton dossier Applications et l'ouvre.
+- elle crée l'app **LinkeD** dans ton dossier Applications (environ 100 Mo à télécharger la première fois) et l'ouvre.
 
 ## 4. Configurer (dans l'app)
 
@@ -41,9 +41,14 @@ Entre ton mot de passe, puis va dans **Réglages** :
 
 ## Au quotidien
 
-- Ouvre **LinkeD** depuis Applications, Launchpad ou ⌘ + Espace. Astuce : glisse-la dans le Dock.
-- Si Chrome (ou Edge, ou Brave) est installé, LinkeD s'ouvre dans sa propre fenêtre, sans barre d'adresse.
+- Ouvre **LinkeD** depuis Applications, Launchpad ou ⌘ + Espace. Astuce : clic droit sur l'icône du Dock → Options → **Garder dans le Dock**.
+- **Fermer la fenêtre ou quitter l'app (⌘Q) n'arrête pas les rappels** : le service LinkeD continue en arrière-plan tant que le Mac est allumé.
+- Raccourcis : ⌘1 Tableau de bord · ⌘2 Planning · ⌘3 Classe · ⌘4 Activité · ⌘, Réglages.
 - **Mettre à jour** : quand une nouvelle version existe, « Mise à jour disponible » apparaît en bas à gauche. Va dans **Réglages → Application → Mettre à jour** : LinkeD télécharge, installe et redémarre tout seul (1 à 3 min), sans toucher à tes réglages.
+
+## La notification « Activité des apps en arrière-plan »
+
+Juste après l'installation, macOS affiche « *LinkeD* (ou *caffeinate*) peut s'exécuter en arrière-plan ». **C'est normal** : c'est le service qui envoie les rappels et empêche la mise en veille pendant qu'il tourne (`caffeinate` est l'outil d'Apple qui garde le Mac éveillé). Ne le désactive pas dans Réglages Système → Général → **Ouverture et extensions**, sinon les rappels s'arrêtent.
 
 ## Garder le Mac éveillé
 

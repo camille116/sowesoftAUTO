@@ -60,6 +60,15 @@ export class Planning {
       .sort((a, b) => (a.next ?? Infinity) - (b.next ?? Infinity) || a.subject.localeCompare(b.subject));
   }
 
+  /** Tous les cours d'un jour (pas seulement ceux à signer), avec salles et campus. */
+  async allDay(date) {
+    await this.refresh();
+    const from = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const to = new Date(from.getTime() + 24 * 3600 * 1000 - 1);
+    const fromIcs = this.calendar ? coursesFromCalendar(this.calendar, from, to) : [];
+    return mergeSessions(fromIcs, manualSessions(this.manual, from, to));
+  }
+
   async day(date) {
     const from = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const to = new Date(from.getTime() + 24 * 3600 * 1000 - 1);

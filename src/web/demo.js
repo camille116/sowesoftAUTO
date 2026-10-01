@@ -53,6 +53,11 @@ const fakeSigner = {
 };
 
 const app = createApp(demoConfig, { signer: fakeSigner, fetcher: async () => parseIcs(ics) });
+for (const [name, phone, chat] of [['Léa', '0612345678', 101], ['Tom', '0623456789', 102], ['Inès', '0634567890', null], ['Hugo', '0645678901', 104]]) {
+  const m = app.members.add({ name, phone });
+  if (chat) app.members.link(m, chat, `${name} (Telegram)`);
+}
+app.members.setPaused(app.members.all()[3], true);
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: -5 });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: 0 });
 
@@ -66,6 +71,9 @@ const whatsapp = {
 const telegram = {
   state: { status: process.env.DEMO_TG || 'waiting_link', username: 'LinkedSignature_bot', owner: { name: 'Camille' }, linkCode: '3f9a1c2e', error: null },
   linkUrl() { return `https://t.me/${this.state.username}?start=${this.state.linkCode}`; },
+  inviteUrl(m) { return `https://t.me/${this.state.username}?start=${m.inviteCode}`; },
+  botUrl() { return `https://t.me/${this.state.username}`; },
+  async sendTo(chatId, text) { console.log('[démo Telegram →', chatId, ']', text); },
   unlink() { this.state.status = 'waiting_link'; },
   async start(token) { if (token && this.state.status === 'off') this.state.status = 'waiting_link'; },
   stop() {},

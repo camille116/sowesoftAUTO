@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
 import { parseCommand } from './commands.js';
 import { dueReminders } from './reminders.js';
-import { msg } from './messages.js';
+import { msg, renderTemplate } from './messages.js';
 import { log } from './logger.js';
 
 /**
@@ -10,7 +10,10 @@ import { log } from './logger.js';
  * et l'appli web appelle directement les mêmes méthodes (sign, markDone, skip…).
  */
 export class Bot {
-  constructor({ planning, store, signer, send, offsets, dryRun }) {
+  constructor({ planning, store, signer, send, offsets, dryRun, members = null, sendToMember = null, memberTemplate = '' }) {
+    this.members = members; // camarades de classe : rappels seulement
+    this.sendToMember = sendToMember;
+    this.memberTemplate = memberTemplate;
     this.planning = planning;
     this.store = store;
     this.signer = signer;
@@ -29,6 +32,46 @@ export class Bot {
       this.store.log('reminder', { title: reminder.session.title, offset: reminder.offset });
       log.info(`Rappel envoyé (${reminder.offset} min) pour ${reminder.session.title}`);
     }
+    await this.tickMembers(sessions, now);
+  }
+
+  async tickMembers(sessions, now) {
+    if (!this.members || !this.sendToMember) return;
+    let sent = 0;
+    for (const { member, reminder } of this.members.due(sessions, this.offsets, now)) {
+      try {
+        await this.sendToMember(member, renderTemplate(this.memberTemplate, { member, session: reminder.session, offset: reminder.offset }));
+        this.members.markReminded(member, reminder.session.id, reminder.index);
+        sent++;
+      } catch (err) {
+        log.warn(`Rappel à ${member.name} impossible : ${err.message}`);
+      }
+    }
+    if (sent) this.store.log('members-reminder', { count: sent, title: sessions.find((x) => x.start <= now && x.end >= now)?.subject });
+  }
+
+  /** Message d'un membre de la classe (il ne peut que gérer ses rappels). */
+  async handleMember(member, text, now = new Date()) {
+    const reply = (t) => this.sendToMember(member, t);
+    const cmd = parseCommand(text);
+    switch (cmd.type) {
+      case 'done': {
+        const current = await this.planning.current(now);
+        if (!current) return reply(msg.memberNoCurrent());
+        this.members.markDone(member, current.id);
+        return reply(msg.memberDone(current));
+      }
+      case 'pause': this.members.setPaused(member, true); return reply(msg.memberPaused());
+      case 'resume': this.members.setPaused(member, false); return reply(msg.memberResumed());
+      case 'today': case 'status':
+        return reply(await this.fullDay(now, "Aujourd'hui", this.members.storeFor(member), msg.memberDay));
+      case 'tomorrow': {
+        const d = new Date(now); d.setDate(d.getDate() + 1);
+        return reply(await this.fullDay(d, 'Demain', this.members.storeFor(member), msg.memberDay));
+      }
+      case 'sign': return reply(msg.memberNoSign());
+      default: return reply(msg.memberHelp());
+    }
   }
 
   async handle(text, now = new Date()) {
@@ -38,10 +81,10 @@ export class Bot {
     switch (cmd.type) {
       case 'sign': return this.sign(cmd.code, now);
       case 'help': return this.send(msg.help(this.dryRun));
-      case 'today': return this.send(msg.day("Aujourd'hui", await this.planning.day(now), this.store));
+      case 'today': return this.send(await this.fullDay(now, "Aujourd'hui"));
       case 'tomorrow': {
         const d = new Date(now); d.setDate(d.getDate() + 1);
-        return this.send(msg.day('Demain', await this.planning.day(d), this.store));
+        return this.send(await this.fullDay(d, 'Demain'));
       }
       case 'week':
         return this.send(msg.week(await this.planning.between(now, new Date(now.getTime() + 7 * 24 * 3600e3)), this.store));
@@ -63,6 +106,13 @@ export class Bot {
       case 'test': return this.test();
       default: return this.send(msg.unknown());
     }
+  }
+
+  /** Journée complète (tous les cours + salles) avec les cours à signer marqués. */
+  async fullDay(date, label, store = this.store, render = msg.fullDay) {
+    const [courses, toSign] = await Promise.all([this.planning.allDay(date), this.planning.day(date)]);
+    const day = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return render(`${label} – ${day}`, courses, new Set(toSign.map((x) => x.id)), (id) => store.isDone(id));
   }
 
   markDone(session) {

@@ -2,6 +2,8 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID;LANGUAGE=fr:Copyright Index-Education - HYPERPLANNING 2026
 METHOD:PUBLISH
+X-WR-CALDESC;LANGUAGE=fr:Emploi du temps de TEST généré par HP - OMNES Education (
+ Campus PARIS) - valable sur la période
 BEGIN:VEVENT
 CATEGORIES:HYPERPLANNING
 UID:Cours-1-1-TEST-Index-Education
@@ -9,7 +11,7 @@ DTSTART:20261019T153000Z
 DTEND:20261019T173000Z
 SUMMARY;LANGUAGE=fr:Marketplaces - SP5 Marketing digital et e-commerce (ECOM) - AUTONOMIE
 DESCRIPTION;LANGUAGE=fr:Matière : Marketplaces\nTD : SP5 Marketing digital et e-c
- ommerce (ECOM)\nType : AUTONOMIE\n
+ ommerce (ECOM)\nSalle : Salle C-3.12 (Salle de projection cinema) - EIFFEL 3\nType : AUTONOMIE\n
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:HYPERPLANNING
@@ -18,7 +20,7 @@ DTSTART:20261019T063000Z
 DTEND:20261019T083000Z
 SUMMARY;LANGUAGE=fr:Marketplaces - SP5 Marketing digital et e-commerce (ECOM) - CRS
 DESCRIPTION;LANGUAGE=fr:Matière : Marketplaces\nEnseignant : M. TEST\nType : CRS\n
-LOCATION;LANGUAGE=fr:Salle 101
+LOCATION;LANGUAGE=fr:Salle EM009 - Amphithéâtre - EIFFEL 1, Salle P436 - EIFFEL 2 (Meet-up)
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:HYPERPLANNING

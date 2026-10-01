@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'">
+  <title>LinkeD</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0c10; color: #e7e9ef; font: 15px -apple-system, BlinkMacSystemFont, sans-serif; -webkit-app-region: drag; }
+    main { height: 100%; display: grid; place-items: center; text-align: center; }
+    .logo { font-weight: 700; font-size: 1.6rem; letter-spacing: -0.03em; }
+    .logo b { background: linear-gradient(135deg, #7c6cff, #22d3ee); -webkit-background-clip: text; color: transparent; }
+    .spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #7c6cff; border-right-color: transparent; animation: s .8s linear infinite; margin: 18px auto 10px; }
+    @keyframes s { to { transform: rotate(1turn); } }
+    p { color: #7d8394; margin: 0; }
+    .err { display: none; }
+    button { -webkit-app-region: no-drag; margin-top: 16px; font: 600 .9rem -apple-system, sans-serif; padding: 9px 16px; border-radius: 10px; border: 0; background: #7c6cff; color: #fff; cursor: pointer; }
+    body.error .spin, body.error .wait { display: none; }
+    body.error .err { display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <div class="logo">Linke<b>D</b></div>
+      <div class="spin"></div>
+      <p class="wait">Démarrage…</p>
+      <div class="err">
+        <p>LinkeD ne répond pas.<br>Relance « Installer LinkeD », ou ouvre le journal (menu Aide).</p>
+        <button onclick="location.href = 'http://localhost:3000'">Réessayer</button>
+      </div>
+    </div>
+  </main>
+  <script>
+    if (location.search.includes('error')) {
+      document.body.classList.add('error');
+      setTimeout(() => { location.href = 'http://localhost:3000'; }, 5000); // nouvel essai automatique
+    }
+  </script>
+</body>
+</html>

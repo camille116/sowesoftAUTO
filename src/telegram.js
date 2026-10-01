@@ -30,7 +30,7 @@ const COMMANDS = [
  * state.status : off (pas de token) → starting → waiting_link (bot prêt, pas encore relié) → ready
  *                + error (token invalide, autre instance…)
  */
-export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch, pollTimeout = 50 }) {
+export function createTelegram({ dataDir, onMessage, onReady, members = null, onMemberMessage, onMemberLinked, fetchImpl = fetch, pollTimeout = 50 }) {
   const file = join(dataDir, 'telegram.json');
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const state = {
@@ -62,13 +62,28 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
   }
 
   /** Envoie un texte (Markdown, avec repli en texte brut si Telegram refuse la mise en forme). */
-  async function sendText(chatId, text) {
+  async function sendText(chatId, text, extra = {}) {
     try {
-      return await call('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown', disable_web_page_preview: true });
+      return await call('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown', disable_web_page_preview: true, ...extra });
     } catch (err) {
-      if (err.code !== 400) throw err;
-      return call('sendMessage', { chat_id: chatId, text: text.replace(/[*_`]/g, ''), disable_web_page_preview: true });
+      if (err.code !== 400 || !/parse/i.test(err.message)) throw err;
+      return call('sendMessage', { chat_id: chatId, text: text.replace(/[*_`]/g, ''), disable_web_page_preview: true, ...extra });
     }
+  }
+
+  const ASK_PHONE = { reply_markup: { keyboard: [[{ text: '📱 Partager mon numéro', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } };
+  const NO_KEYBOARD = { reply_markup: { remove_keyboard: true } };
+
+  /** Message vers un membre de la classe (par son chat Telegram). */
+  async function sendTo(chatId, text) {
+    const clean = text.startsWith(BOT_TAG) ? text.slice(BOT_TAG.length).trimStart() : text;
+    return sendText(chatId, clean);
+  }
+
+  async function linkMember(member, chatId, name) {
+    members.link(member, chatId, name);
+    log.info(`Telegram : ${member.name} a rejoint les rappels`);
+    await onMemberLinked?.(member);
   }
 
   async function sendPhoto(chatId, caption, imagePath) {
@@ -98,10 +113,27 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
 
   async function handleUpdate(update) {
     const m = update.message;
-    if (!m?.text || m.chat?.type !== 'private') return;
+    if (!m || m.chat?.type !== 'private') return;
     const chatId = m.chat.id;
-    const text = m.text.trim();
     const name = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' ') || m.from?.username || 'toi';
+
+    // Un camarade partage son numéro : on l'inscrit s'il est dans la liste de l'admin.
+    // On vérifie que c'est bien SON numéro (Telegram indique à qui appartient le contact partagé).
+    if (m.contact) {
+      if (!members) return;
+      if (m.contact.user_id !== m.from?.id) {
+        return sendText(chatId, '🔒 Partage *ton* numéro avec le bouton ci-dessous, pas celui de quelqu’un d’autre.', ASK_PHONE).catch(() => {});
+      }
+      const member = members.byPhone(m.contact.phone_number);
+      if (!member) {
+        return sendText(chatId, '🙈 Ton numéro n’est pas dans la liste. Demande à la personne qui gère LinkeD de t’ajouter, puis réessaie.', ASK_PHONE).catch(() => {});
+      }
+      await sendText(chatId, '✅ Numéro vérifié !', NO_KEYBOARD).catch(() => {});
+      return linkMember(member, chatId, name);
+    }
+
+    if (!m.text) return;
+    const text = m.text.trim();
 
     // Liaison : /start <code> (lien de l'appli) ou le code collé tel quel
     const start = /^\/start(?:@\w+)?\s*(\S*)/i.exec(text);
@@ -116,7 +148,19 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
       return;
     }
 
+    // Lien d'invitation personnel d'un camarade
+    const invited = members?.byInvite(given);
+    if (invited) return linkMember(invited, chatId, name);
+
     if (!state.owner || state.owner.chatId !== chatId) {
+      const member = members?.byChat(chatId);
+      if (member) {
+        const cmd = text.replace(/^\/([a-z]+)(?:@\w+)?/i, '$1');
+        return onMemberMessage?.(member, start ? 'aide' : cmd);
+      }
+      if (members && state.owner) {
+        return sendText(chatId, '👋 *LinkeD* rappelle à ta classe de signer sur SoWeSoft.\nPour recevoir les rappels, appuie sur le bouton : je vérifie que ton numéro est dans la liste.', ASK_PHONE).catch(() => {});
+      }
       await sendText(chatId, state.owner
         ? '🔒 Ce bot est privé.'
         : '👋 Pour me relier, ouvre l’app LinkeD → Réglages → *Relier Telegram*.').catch(() => {});
@@ -194,5 +238,8 @@ export function createTelegram({ dataDir, onMessage, onReady, fetchImpl = fetch,
 
   const linkUrl = () => (state.username ? `https://t.me/${state.username}?start=${state.linkCode}` : null);
 
-  return { state, send, start, stop, unlink, linkUrl, handleUpdate };
+  const inviteUrl = (member) => (state.username ? `https://t.me/${state.username}?start=${member.inviteCode}` : null);
+  const botUrl = () => (state.username ? `https://t.me/${state.username}` : null);
+
+  return { state, send, sendTo, start, stop, unlink, linkUrl, inviteUrl, botUrl, handleUpdate };
 }

@@ -5,7 +5,7 @@ import { join, extname } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import QRCode from 'qrcode';
 import { log } from '../logger.js';
-import { msg } from '../messages.js';
+import { msg, renderTemplate, TEMPLATE_VARS, DEFAULT_MEMBER_TEMPLATE } from '../messages.js';
 
 const PUBLIC = join(import.meta.dirname, 'public');
 const TYPES = {
@@ -65,6 +65,8 @@ function sessionView(s, store, now) {
     source: s.source,
     subject: s.subject,
     type: s.type,
+    rooms: (s.rooms || []).map((r) => r.label),
+    campus: s.campus || '',
     status: st.signedAt ? 'signed' : st.skipped ? 'skipped' : s.end < now ? 'missed' : 'pending',
     signedBy: st.signedBy,
     current: s.start <= now && s.end >= now,
@@ -78,7 +80,7 @@ function sessionView(s, store, now) {
 export function createWebServer({ app, channels, updater, password, dataDir }) {
   const wa = () => channels?.whatsapp || null;
   const tg = () => channels?.telegram || null;
-  const { bot, store, planning, signer, settings } = app;
+  const { bot, store, planning, signer, settings, members } = app;
   const tokens = new Map(); // jeton de session → date d'expiration
   const failures = new Map(); // adresse IP → { count, until }
 
@@ -280,6 +282,62 @@ export function createWebServer({ app, channels, updater, password, dataDir }) {
       } catch (err) {
         json(res, 400, { error: err.message });
       }
+    },
+
+    // ── Classe : membres qui reçoivent les rappels Telegram ──
+    'GET /api/members': async (req, res) => {
+      const t = tg();
+      const sample = {
+        member: { name: 'Léa' },
+        session: (await planning.current(new Date(), 60 * 24)) || {
+          subject: 'Marketplaces', type: 'AUTONOMIE', start: new Date(new Date().setHours(17, 30, 0, 0)), end: new Date(new Date().setHours(19, 30, 0, 0)),
+        },
+        offset: 0,
+      };
+      json(res, 200, {
+        telegram: { status: t?.state.status || 'off', username: t?.state.username || null, botUrl: t?.botUrl?.() || null },
+        members: members.all().map((m) => members.view(m, (x) => t?.inviteUrl?.(x))),
+        template: settings.get().memberTemplate,
+        defaultTemplate: DEFAULT_MEMBER_TEMPLATE,
+        vars: TEMPLATE_VARS,
+        preview: renderTemplate(settings.get().memberTemplate, sample),
+      });
+    },
+
+    'POST /api/members': async (req, res) => {
+      try {
+        const member = members.add(await readBody(req));
+        store.log('member-added', { title: member.name });
+        json(res, 200, { member: members.view(member, (x) => tg()?.inviteUrl?.(x)) });
+      } catch (err) {
+        json(res, 400, { error: err.message });
+      }
+    },
+
+    'POST /api/members/action': async (req, res) => {
+      const { id, action } = await readBody(req);
+      const member = members.get(id);
+      if (!member) return json(res, 404, { error: 'Membre introuvable' });
+      try {
+        if (action === 'remove') { members.remove(id); store.log('member-removed', { title: member.name }); return json(res, 200, { ok: true }); }
+        if (action === 'pause') members.setPaused(member, true);
+        else if (action === 'resume') members.setPaused(member, false);
+        else if (action === 'invite') members.newInvite(member);
+        else if (action === 'test') {
+          if (!member.chatId) return json(res, 409, { error: `${member.name} n’a pas encore rejoint le bot` });
+          if (tg()?.state.status !== 'ready' && tg()?.state.status !== 'waiting_link') return json(res, 409, { error: 'Le bot Telegram n’est pas prêt' });
+          await tg().sendTo(member.chatId, msg.memberTest(member));
+        } else return json(res, 400, { error: 'Action inconnue' });
+        json(res, 200, { member: members.view(member, (x) => tg()?.inviteUrl?.(x)) });
+      } catch (err) {
+        json(res, 500, { error: err.message });
+      }
+    },
+
+    'POST /api/members/preview': async (req, res) => {
+      const { template } = await readBody(req);
+      const session = { subject: 'Marketplaces', type: 'AUTONOMIE', start: new Date(new Date().setHours(17, 30, 0, 0)), end: new Date(new Date().setHours(19, 30, 0, 0)) };
+      json(res, 200, { preview: renderTemplate(String(template || '').slice(0, 1000), { member: { name: 'Léa' }, session, offset: 0 }) });
     },
 
     'GET /api/settings': async (req, res) => json(res, 200, settings.public()),

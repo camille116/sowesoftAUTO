@@ -91,3 +91,18 @@ test('liste des matières pour l’appli', async () => {
   const sessions = await planning.between(new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00'));
   assert.deepEqual(sessions.map((s) => s.subject), ["Outil d'analyse"]);
 });
+
+test('salles, bâtiment et campus (format OMNES)', async () => {
+  const { coursesFromCalendar, parseRooms, calendarCampus } = await import('../src/planning/ics.js');
+  const hp = parseIcs(readFileSync(new URL('./fixtures/hyperplanning.ics', import.meta.url), 'utf8'));
+  assert.equal(calendarCampus(hp), 'Paris');
+  const courses = coursesFromCalendar(hp, new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00'));
+  const crs = courses.find((c) => c.type === 'CRS');
+  assert.deepEqual(crs.rooms.map((r) => r.label), ['EM009 · Eiffel 1', 'P436 · Eiffel 2']);
+  assert.equal(crs.rooms[0].kind, 'Amphithéâtre');
+  assert.equal(crs.campus, 'Paris');
+  const auto = courses.find((c) => c.type === 'AUTONOMIE');
+  assert.deepEqual(auto.rooms.map((r) => r.label), ['C-3.12 · Eiffel 3'], 'salle lue dans la description');
+  assert.deepEqual(courses.find((c) => c.type === 'ELEARNING').rooms, []);
+  assert.deepEqual(parseRooms({ location: 'Salle G006 - EIFFEL 4 (Meet-up)' }).map((r) => r.label), ['G006 · Eiffel 4']);
+});

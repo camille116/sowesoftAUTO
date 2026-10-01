@@ -16,7 +16,15 @@ const telegram = createTelegram({
   dataDir: config.dataDir,
   onMessage: (text) => app.bot.handle(text),
   onReady: () => welcome(telegram)(),
+  // camarades de classe : rappels seulement
+  members: app.members,
+  onMemberMessage: (member, text) => app.bot.handleMember(member, text),
+  onMemberLinked: (member) => {
+    app.store.log('member-joined', { title: member.name });
+    return telegram.sendTo(member.chatId, msg.memberWelcome(member)).catch((e) => log.error(e));
+  },
 });
+app.channel.sendToMember = (member, text) => telegram.sendTo(member.chatId, text);
 
 // WhatsApp : lance un Chromium, donc seulement s'il est choisi.
 let whatsapp = null;
@@ -46,12 +54,15 @@ const channels = {
   get whatsapp() { return whatsapp; },
 };
 
+// Le bot Telegram tourne dès qu'il a un token : il sert aussi aux rappels de la classe,
+// même si l'admin reçoit ses propres messages sur WhatsApp.
+let telegramToken = null;
 function applyChannel(s) {
-  if (s.channel === 'telegram') telegram.start(s.telegramToken);
-  else {
-    telegram.stop();
-    ensureWhatsApp();
+  if (s.telegramToken !== telegramToken) {
+    telegramToken = s.telegramToken;
+    telegram.start(s.telegramToken);
   }
+  if (s.channel === 'whatsapp') ensureWhatsApp();
 }
 
 app.channel.send = (...args) => channels.active.send(...args);

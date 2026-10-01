@@ -66,5 +66,22 @@ test('pause coupe les rappels', async () => {
 test('planning du jour', async () => {
   const { bot, sent } = setup();
   await bot.handle('planning', at('09:00'));
-  assert.match(sent[0].text, /13:30–17:00 · Autonomie projet/);
+  assert.match(sent[0].text, /⬜ \*13:30–17:00\* Autonomie projet/);
+});
+
+test('/demain : tous les cours avec salle, bâtiment et campus', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseIcs } = await import('../src/planning/ics.js');
+  const hp = parseIcs(readFileSync(new URL('./fixtures/hyperplanning.ics', import.meta.url), 'utf8'));
+  const sent = [];
+  const bot = new Bot({
+    planning: new Planning({ icsUrl: 'x', keywords: ['autonomie'], manual: {} }, { fetcher: async () => hp }),
+    store: memoryStore(), signer: { busy: false }, offsets: [0], dryRun: false,
+    send: async (text) => sent.push(text),
+  });
+  await bot.handle('/demain'.slice(1), new Date('2026-10-18T20:00:00+02:00')); // la veille du lundi 19
+  const text = sent[0];
+  assert.match(text, /Demain – lundi 19 octobre\* · campus Paris/);
+  assert.match(text, /▫️ \*08:30–10:30\* Marketplaces _crs_\n {6}📍 EM009 · Eiffel 1 \(Amphithéâtre\) \+1 salle/);
+  assert.match(text, /⬜ \*17:30–19:30\* Marketplaces _autonomie_\n {6}📍 C-3\.12 · Eiffel 3/);
 });

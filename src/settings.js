@@ -14,6 +14,7 @@ export class Settings {
   constructor(dataDir, defaults) {
     mkdirSync(dataDir, { recursive: true });
     this.file = join(dataDir, 'settings.json');
+    this.defaults = defaults;
     const saved = existsSync(this.file) ? JSON.parse(readFileSync(this.file, 'utf8')) : {};
     this.values = {
       ...defaults,
@@ -56,6 +57,11 @@ export class Settings {
       if (!['auto', 'all', 'custom'].includes(mode)) throw new Error('Choix de notifications inconnu');
       const subjects = 'subjects' in patch.notify ? toList(patch.notify.subjects) : next.notify?.subjects || [];
       next.notify = { mode, subjects: [...new Set(subjects)] };
+    }
+    if ('memberTemplate' in patch) {
+      const t = String(patch.memberTemplate || '').trim();
+      if (t.length > 1000) throw new Error('Message trop long (1000 caractères max)');
+      next.memberTemplate = t || this.defaults.memberTemplate;
     }
     if ('whatsappNumber' in patch) {
       const n = String(patch.whatsappNumber || '').replace(/\D/g, '').replace(/^0(\d{9})$/, '33$1');

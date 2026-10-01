@@ -1,19 +1,50 @@
 #!/bin/bash
-# Fabrique LinkeD.app (dossier Applications) : un double-clic démarre LinkeD si besoin et ouvre l'appli.
+# Fabrique l'app « LinkeD » (dossier Applications) : une vraie app Mac (fenêtre, Dock, menus),
+# construite avec Electron (comme Spotify, Discord, Slack). Elle affiche le service LinkeD qui tourne en arrière-plan.
 #   bash scripts/mac/make-app.sh
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-LABEL="com.linked.app"
+DESKTOP="$APP_DIR/desktop"
+ELECTRON_APP="$DESKTOP/node_modules/electron/dist/Electron.app"
 DEST="/Applications"
 [ -w "$DEST" ] || DEST="$HOME/Applications"
 mkdir -p "$DEST"
 APP="$DEST/LinkeD.app"
+ICON_SRC="$APP_DIR/assets/icon-1024.png"
+
+make_icns() {  # $1 = fichier .icns de sortie
+  [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1 || return 0
+  local set; set="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$set"
+  for s in 16 32 128 256 512; do
+    sips -z $s $s "$ICON_SRC" --out "$set/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s * 2)) $((s * 2)) "$ICON_SRC" --out "$set/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$set" -o "$1"
+}
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-cat > "$APP/Contents/Info.plist" <<PLIST
+if [ -d "$ELECTRON_APP" ]; then
+  # ── Vraie app : Electron renommé en LinkeD ──
+  ditto "$ELECTRON_APP" "$APP"
+  RES="$APP/Contents/Resources"
+  rm -f "$RES/default_app.asar"
+  mkdir -p "$RES/app"
+  cp "$DESKTOP/package.json" "$DESKTOP/main.js" "$DESKTOP/preload.js" "$DESKTOP/loading.html" "$RES/app/"
+  make_icns "$RES/electron.icns"
+  PL="$APP/Contents/Info.plist"
+  plutil -replace CFBundleName -string "LinkeD" "$PL"
+  plutil -replace CFBundleDisplayName -string "LinkeD" "$PL"
+  plutil -replace CFBundleIdentifier -string "com.linked.desktop" "$PL"
+  plutil -replace NSHumanReadableCopyright -string "LinkeD" "$PL" 2>/dev/null || true
+  # signature locale : obligatoire sur les Mac Apple Silicon après modification de l'app
+  codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+else
+  # ── Secours (Electron absent) : petit lanceur qui ouvre l'app dans une fenêtre de navigateur ──
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -24,46 +55,22 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>LinkeD</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict>
 </plist>
 PLIST
-
-cat > "$APP/Contents/MacOS/LinkeD" <<LAUNCHER
+  cat > "$APP/Contents/MacOS/LinkeD" <<'LAUNCHER'
 #!/bin/bash
-# Lanceur LinkeD : (re)démarre le service en arrière-plan si besoin, puis ouvre l'appli.
 URL="http://localhost:3000"
-PLIST="\$HOME/Library/LaunchAgents/$LABEL.plist"
-up() { curl -s -o /dev/null --max-time 2 "\$URL/api/me"; }
-if ! up; then
-  launchctl bootstrap "gui/\$(id -u)" "\$PLIST" 2>/dev/null || launchctl kickstart -k "gui/\$(id -u)/$LABEL" 2>/dev/null
-  for _ in \$(seq 1 40); do up && break; sleep 1; done
-fi
-if ! up; then
-  osascript -e 'display alert "LinkeD ne démarre pas" message "Ouvre le journal : ~/LinkeD/data/linked.log, ou relance « Installer LinkeD »." as critical'
-  exit 1
-fi
-# Fenêtre d'app sans barre d'adresse si Chrome est installé, sinon navigateur par défaut
-for BROWSER in "Google Chrome" "Microsoft Edge" "Brave Browser"; do
-  if [ -d "/Applications/\$BROWSER.app" ]; then
-    open -na "\$BROWSER" --args --app="\$URL" && exit 0
-  fi
+up() { curl -s -o /dev/null --max-time 2 "$URL/api/me"; }
+up || { launchctl kickstart -k "gui/$(id -u)/com.linked.app" 2>/dev/null; for _ in $(seq 1 40); do up && break; sleep 1; done; }
+for B in "Google Chrome" "Microsoft Edge" "Brave Browser"; do
+  [ -d "/Applications/$B.app" ] && open -na "$B" --args --app="$URL" && exit 0
 done
-open "\$URL"
+open "$URL"
 LAUNCHER
-chmod +x "$APP/Contents/MacOS/LinkeD"
-
-# Icône (.icns) à partir de assets/icon-1024.png
-ICON_SRC="$APP_DIR/assets/icon-1024.png"
-if [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1; then
-  SET="$(mktemp -d)/AppIcon.iconset"
-  mkdir -p "$SET"
-  for s in 16 32 128 256 512; do
-    sips -z $s $s "$ICON_SRC" --out "$SET/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s * 2)) $((s * 2)) "$ICON_SRC" --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
-  done
-  iconutil -c icns "$SET" -o "$APP/Contents/Resources/AppIcon.icns"
+  chmod +x "$APP/Contents/MacOS/LinkeD"
+  make_icns "$APP/Contents/Resources/AppIcon.icns"
 fi
 
 touch "$APP"   # force le Finder à rafraîchir l'icône

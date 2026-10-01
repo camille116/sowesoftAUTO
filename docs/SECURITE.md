@@ -12,6 +12,7 @@ Audit réalisé le 1er octobre 2026 sur l'ensemble du projet (code, dépôt GitH
 | Session WhatsApp (si utilisée) | `~/LinkeD/data/whatsapp-session/` | Idem : elle donne accès à ton WhatsApp |
 | Session SoWeSoft (~25 jours) | `~/LinkeD/data/sowesign-profile/` | Idem |
 | Captures SoWeSoft (ton nom, tes cours) | `~/LinkeD/data/screenshots/`, **supprimées après 30 jours** | Idem |
+| **Camarades de classe** : prénom, numéro de téléphone, identifiant Telegram | `~/LinkeD/data/members.json` (lisible par toi seul·e) | Toi, et toute personne qui a accès à ta session Mac |
 | Messages du bot (rappels, codes, captures) | Serveurs **Telegram** (ou WhatsApp) | Telegram : les messages de bot ne sont pas chiffrés de bout en bout |
 | Code source | GitHub, **dépôt public** | Tout le monde |
 
@@ -25,7 +26,16 @@ Ce qui est public et sans danger : le code, le code établissement OMNES (`7705`
 
 ⚠️ À ne **jamais** faire : coller un mot de passe, un token ou ton lien iCal dans un fichier du dépôt, une *issue* ou un commentaire GitHub.
 
-## 3. Failles trouvées et corrigées
+## 3. Données de tes camarades (fonction « Classe »)
+
+- **Consentement** : n'ajoute que les personnes qui te l'ont demandé. Ce sont des données personnelles (RGPD) : tu en es responsable.
+- **Minimum de données** : un prénom et un numéro, rien d'autre. Ni mot de passe ni accès SoWeSoft. LinkeD **ne signe jamais** à leur place.
+- **Inscription vérifiée** : un camarade ne peut rejoindre le bot qu'en partageant **son propre** numéro (Telegram indique à qui appartient le contact partagé), ou par son lien personnel. Un inconnu qui trouve le bot ne reçoit rien.
+- **Ils gardent la main** : *stop* coupe leurs rappels. Toi, tu peux les mettre en pause ou les retirer à tout moment, et la suppression efface leurs données de `members.json`.
+- **Ce qu'ils voient** : uniquement leurs rappels, le planning du jour (cours et salles) et leurs propres réponses. Ils ne voient ni les autres membres, ni tes réglages, ni ton compte.
+- Les numéros ne sont **jamais** envoyés à Telegram : le bot reçoit le numéro seulement quand la personne le partage elle-même.
+
+## 4. Failles trouvées et corrigées
 
 | Gravité | Problème | Correction |
 |---|---|---|
@@ -39,7 +49,7 @@ Ce qui est public et sans danger : le code, le code établissement OMNES (`7705`
 
 Déjà en place avant l'audit : bot Telegram **privé** (il ne répond qu'au compte relié avec le code de l'app), mot de passe comparé en temps constant, cookie `HttpOnly` + `SameSite=Strict`, fichiers de configuration en `600` et dossier `data/` en `700`, captures servies sans traversée de dossier, **aucune nouvelle tentative de connexion SoWeSoft après un échec** (le compte serait bloqué au bout de 3).
 
-## 4. Risques qui restent (et comment les limiter)
+## 5. Risques qui restent (et comment les limiter)
 
 1. **Quelqu'un qui utilise ta session Mac** peut lire tes identifiants : les fichiers sont protégés par les droits macOS, mais pas chiffrés par LinkeD.
    → Active **FileVault** (Réglages Système → Confidentialité et sécurité), mets un **mot de passe de session** et verrouille ton Mac quand tu t'absentes.
@@ -51,7 +61,7 @@ Déjà en place avant l'audit : bot Telegram **privé** (il ne répond qu'au com
    → Préfère Telegram. Sinon, vérifie de temps en temps WhatsApp → Appareils connectés.
 5. **Usage de l'émargement** : signer en étant absent·e reste une fausse déclaration, bot ou pas. Vérifie aussi que le règlement de ton école autorise ce type d'outil.
 
-## 5. À faire de ton côté
+## 6. À faire de ton côté
 
 - [ ] **Change ton mot de passe SoWeSoft** : il a été écrit dans une conversation, donc il ne doit plus être considéré comme secret. Mets ensuite le nouveau dans l'app.
 - [ ] Choisis un **mot de passe d'app** différent de tes autres mots de passe.

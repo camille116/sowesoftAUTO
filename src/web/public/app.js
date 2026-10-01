@@ -41,7 +41,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ── Navigation ────────────────────────────────────────────
-const views = ['home', 'planning', 'history', 'settings'];
+const views = ['home', 'planning', 'class', 'history', 'settings'];
 function route() {
   const name = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
   $$('.view').forEach((v) => (v.hidden = v.dataset.view !== name));
@@ -49,7 +49,7 @@ function route() {
     if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
-  ({ home: loadStatus, planning: loadPlanning, history: loadHistory, settings: loadSettings })[name]();
+  ({ home: loadStatus, planning: loadPlanning, class: loadClass, history: loadHistory, settings: loadSettings })[name]();
 }
 window.addEventListener('hashchange', route);
 
@@ -149,7 +149,7 @@ async function loadToday() {
   list.innerHTML = data.sessions.map((x) => `
     <li>
       <span class="t">${fmtTime(x.start)}–${fmtTime(x.end)}</span>
-      <span class="n">${esc(x.subject || x.title)}</span>
+      <span class="n">${esc(x.subject || x.title)}${x.rooms?.length ? ` <span class="muted small">· ${esc(x.rooms[0])}</span>` : ''}</span>
       <span class="status status-${x.status}">${STATUS[x.status]}</span>
     </li>`).join('');
 }
@@ -248,7 +248,7 @@ async function loadPlanning() {
             <div class="slot-meta">
               <span class="status status-${s.status}">${STATUS[s.status]}${s.signedBy === 'bot' ? ' par LinkeD' : ''}</span>
               ${s.type ? `<span class="tag">${esc(s.type)}</span>` : ''}
-              <span class="slot-sub">${s.source === 'ics' ? 'Hyperplanning' : 'ajouté à la main'}</span>
+              <span class="slot-sub">${s.rooms?.length ? `📍 ${esc(s.rooms.join(', '))}${s.campus ? ` · ${esc(s.campus)}` : ''}` : s.source === 'ics' ? 'Hyperplanning' : 'ajouté à la main'}</span>
             </div>
           </div>
           <div class="slot-actions">
@@ -295,6 +295,10 @@ function describe(h) {
     case 'resume': return ['▶️', 'Rappels réactivés'];
     case 'test': return [h.ok ? '🔌' : '⚠️', h.ok ? 'Connexion SoWeSoft OK' : 'Connexion SoWeSoft échouée', h.reason];
     case 'settings': return ['⚙️', 'Réglages modifiés'];
+    case 'members-reminder': return ['👥', `Rappel envoyé à ${h.count} membre${h.count > 1 ? 's' : ''}`, h.title];
+    case 'member-joined': return ['🎉', `${h.title} a rejoint les rappels`];
+    case 'member-added': return ['➕', `${h.title} ajouté·e à la classe`];
+    case 'member-removed': return ['➖', `${h.title} retiré·e de la classe`];
     case 'notif-test': return ['📱', `Notification de test envoyée${h.channel ? ` (${h.channel})` : ''}`];
     default: return ['•', h.type];
   }
@@ -655,6 +659,131 @@ function waitForRestart() {
   };
   setTimeout(tick, 3000);
 }
+
+// ── Classe ────────────────────────────────────────────────
+let classData = null;
+const MEMBER_STATUS = { invited: 'Invité·e', active: 'Actif', paused: 'En pause' };
+const fmtPhone = (n) => (n.startsWith('33') && n.length === 11 ? `0${n.slice(2)}`.replace(/(\d{2})(?=\d)/g, '$1 ') : `+${n}`);
+
+/** Aperçu façon Telegram : *gras*, _italique_, retours à la ligne. */
+function telegramHtml(text) {
+  return esc(text).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>');
+}
+
+async function loadClass() {
+  try { classData = await api('/api/members'); } catch { return; }
+  const { telegram, members } = classData;
+  const active = members.filter((m) => m.status === 'active').length;
+  $('#class-count').textContent = `${active} actif${active > 1 ? 's' : ''} · ${members.length} membre${members.length > 1 ? 's' : ''}`;
+
+  const alert = $('#class-alert');
+  alert.hidden = Boolean(telegram.username);
+  if (!telegram.username) alert.innerHTML = '<b>Le bot Telegram n’est pas encore configuré.</b> Crée-le dans <a href="#settings">Réglages → Messagerie</a> : il sert aussi aux rappels de la classe.';
+
+  $('#share-text').textContent = telegram.botUrl
+    ? `📣 Rappels SoWeSoft automatiques !\nOuvre ${telegram.botUrl} → Démarrer → « Partager mon numéro ».\nTu recevras un message à chaque fois qu'il faut signer.`
+    : '—';
+
+  if (document.activeElement !== $('#member-template')) $('#member-template').value = classData.template;
+  $('#template-preview').innerHTML = telegramHtml(classData.preview);
+  $('#template-vars').innerHTML = Object.entries(classData.vars)
+    .map(([k, label]) => `<button type="button" class="chip" data-var="${k}" title="${esc(label)}">{${k}}</button>`).join('');
+  renderMembers();
+}
+
+function renderMembers() {
+  const q = $('#member-search').value.trim().toLowerCase();
+  const list = classData.members.filter((m) => !q || m.name.toLowerCase().includes(q) || m.phone.includes(q.replace(/\D/g, '') || '§'));
+  if (!classData.members.length) {
+    $('#member-list').innerHTML = '<li class="empty" style="display:block">Personne pour l’instant. Ajoute le prénom et le numéro d’un·e camarade ci-dessus.</li>';
+    return;
+  }
+  $('#member-list').innerHTML = list.map((m) => `
+    <li data-id="${m.id}">
+      <span class="avatar" aria-hidden="true">${esc(m.name.slice(0, 1).toUpperCase())}</span>
+      <div style="min-width:0">
+        <div class="member-name">${esc(m.name)}</div>
+        <div class="member-sub">${esc(fmtPhone(m.phone))}</div>
+      </div>
+      <div>
+        <span class="status status-${m.status}">${MEMBER_STATUS[m.status]}</span>
+        <div class="member-sub">${m.linked ? `Telegram : ${esc(m.telegramName || '—')}` : 'pas encore rejoint'}</div>
+      </div>
+      <div class="member-actions">
+        ${m.linked
+          ? `<button class="chip-btn" data-member-action="test">Notif test</button>
+             <button class="chip-btn" data-member-action="${m.status === 'paused' ? 'resume' : 'pause'}">${m.status === 'paused' ? 'Reprendre' : 'Pause'}</button>`
+          : `<button class="chip-btn" data-member-action="copy" ${m.inviteUrl ? '' : 'disabled'}>Copier son lien</button>`}
+        <button class="chip-btn danger" data-member-action="remove">Retirer</button>
+      </div>
+    </li>`).join('');
+}
+
+async function copy(text, done = 'Copié ✓') {
+  try { await navigator.clipboard.writeText(text); toast(done); } catch { prompt('Copie ce texte :', text); }
+}
+
+$('#member-search').addEventListener('input', () => classData && renderMembers());
+$('#member-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    const { member } = await api('/api/members', { name: f.name.value, phone: f.phone.value });
+    f.reset();
+    toast(`${member.name} ajouté·e : envoie-lui le lien du bot`);
+    loadClass();
+  } catch (err) { toast(err.message); }
+});
+$('#share-copy').addEventListener('click', () => copy($('#share-text').textContent, 'Message copié, colle-le dans le groupe de classe'));
+
+$('#member-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-member-action]');
+  if (!btn) return;
+  const id = btn.closest('li').dataset.id;
+  const member = classData.members.find((m) => m.id === id);
+  const action = btn.dataset.memberAction;
+  if (action === 'copy') {
+    return copy(`Salut ${member.name} ! Pour recevoir les rappels de signature SoWeSoft, ouvre ce lien puis appuie sur Démarrer : ${member.inviteUrl}`, 'Lien perso copié');
+  }
+  if (action === 'remove' && !confirm(`Retirer ${member.name} ? Il·elle ne recevra plus de rappels.`)) return;
+  try {
+    await api('/api/members/action', { id, action });
+    toast({ test: `Notif envoyée à ${member.name}`, pause: 'Rappels en pause', resume: 'Rappels réactivés', remove: `${member.name} retiré·e` }[action]);
+    loadClass();
+  } catch (err) { toast(err.message); }
+});
+
+// Modèle de message : variables cliquables + aperçu en direct
+let previewTimer;
+$('#member-template').addEventListener('input', () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    const { preview } = await api('/api/members/preview', { template: $('#member-template').value }).catch(() => ({ preview: '' }));
+    $('#template-preview').innerHTML = telegramHtml(preview);
+  }, 250);
+});
+$('#template-vars').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-var]');
+  if (!chip) return;
+  const area = $('#member-template');
+  const token = `{${chip.dataset.var}}`;
+  const { selectionStart: a, selectionEnd: b, value } = area;
+  area.value = value.slice(0, a) + token + value.slice(b);
+  area.focus();
+  area.selectionStart = area.selectionEnd = a + token.length;
+  area.dispatchEvent(new Event('input'));
+});
+$('#template-save').addEventListener('click', async () => {
+  try {
+    await api('/api/settings', { memberTemplate: $('#member-template').value });
+    toast('Message enregistré');
+    loadClass();
+  } catch (err) { toast(err.message); }
+});
+$('#template-reset').addEventListener('click', () => {
+  $('#member-template').value = classData.defaultTemplate;
+  $('#member-template').dispatchEvent(new Event('input'));
+});
 
 // ── Démarrage ─────────────────────────────────────────────
 let statusTimer;

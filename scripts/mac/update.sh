@@ -21,11 +21,12 @@ SRC="$(find "$TMP/src" -mindepth 1 -maxdepth 1 -type d | head -1)"
 
 rsync -a --delete \
   --exclude node_modules --exclude data --exclude .env --exclude .git --exclude VERSION \
-  --exclude config/planning.json \
+  --exclude config/planning.json --exclude desktop/node_modules \
   "$SRC/" "$APP_DIR/"
 
 cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund --loglevel=error
+[ -d desktop ] && (cd desktop && npm install --no-audit --no-fund --loglevel=error) || echo "app Mac : installation ignorée"
 echo "$SHA" > VERSION
 bash scripts/mac/make-app.sh >/dev/null 2>&1 || true
 echo "[$(date '+%F %T')] OK"

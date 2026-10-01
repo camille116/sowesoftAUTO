@@ -7,7 +7,62 @@ const fmtDay = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'num
 
 export const BOT_TAG = '🤖';
 
-const slot = (s) => `${fmtTime(s.start)}–${fmtTime(s.end)} · ${s.title}`;
+/** Message de rappel envoyé aux membres de la classe (modifiable dans l'app → Classe). */
+export const DEFAULT_MEMBER_TEMPLATE =
+  '⏰ {prenom}, pense à signer sur SoWeSoft !\n📚 {cours} · {debut}–{fin}\n\nRéponds *fait* quand c\'est signé.';
+
+export const TEMPLATE_VARS = {
+  prenom: 'Prénom du membre',
+  cours: 'Matière',
+  type: 'Type (AUTONOMIE, CRS…)',
+  debut: 'Heure de début',
+  fin: 'Heure de fin',
+  date: 'Jour',
+  moment: '« dans 5 min », « maintenant »…',
+};
+
+/** Remplace {prenom}, {cours}… dans un modèle de message. */
+export function renderTemplate(template, { member, session, offset }) {
+  const fmt = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const vars = {
+    prenom: member?.name || '',
+    cours: session?.subject || session?.title || '',
+    type: session?.type || '',
+    debut: session ? fmt(session.start) : '',
+    fin: session ? fmt(session.end) : '',
+    date: session ? session.start.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '',
+    moment: offset == null ? '' : offset < 0 ? `dans ${-offset} min` : offset === 0 ? 'maintenant' : `depuis ${offset} min`,
+  };
+  return String(template || DEFAULT_MEMBER_TEMPLATE).replace(/\{(\w+)\}/g, (all, key) => (key in vars ? vars[key] : all));
+}
+
+const slot = (s) => `${fmtTime(s.start)}–${fmtTime(s.end)} · ${s.subject || s.title}`;
+
+/** « 📍 G006 · Eiffel 4 » (+ autres salles), ou « 🏠 À distance » pour l'autonomie / l'e-learning sans salle. */
+export function roomLine(s) {
+  if (s.rooms?.length) {
+    const [first, ...rest] = s.rooms;
+    return `📍 ${first.label}${first.kind ? ` (${first.kind})` : ''}${rest.length ? ` +${rest.length} salle${rest.length > 1 ? 's' : ''}` : ''}`;
+  }
+  return /AUTONOMIE|ELEARNING|DISTANCIEL/i.test(s.type || s.title) ? '🏠 À distance / pas de salle' : '';
+}
+
+/**
+ * Journée complète : tous les cours avec salle et campus ; ⬜/✅ sur ceux à signer.
+ * `toSign` = ids des cours notifiés, `isDone(id)` = déjà signé.
+ */
+function fullDay(label, courses, toSign, isDone) {
+  if (!courses.length) return `📅 *${label}* : aucun cours. Profite ! 🌿`;
+  const campuses = [...new Set(courses.map((c) => c.campus).filter(Boolean))];
+  const lines = courses.map((c) => {
+    const icon = toSign.has(c.id) ? (isDone(c.id) ? '✅' : '⬜') : '▫️';
+    const type = c.type ? ` _${c.type.toLowerCase()}_` : '';
+    const room = roomLine(c);
+    return `${icon} *${fmtTime(c.start)}–${fmtTime(c.end)}* ${c.subject || c.title}${type}${room ? `\n      ${room}` : ''}`;
+  });
+  const legend = toSign.size ? '\n\n⬜ à signer · ✅ signé · ▫️ pas de rappel' : '';
+  return `📅 *${label}*${campuses.length ? ` · campus ${campuses.join(', ')}` : ''}\n\n${lines.join('\n')}${legend}`;
+}
 
 export const msg = {
   welcome: () =>
@@ -46,6 +101,8 @@ export const msg = {
   skipped: (session) => `${BOT_TAG} 🙈 Ok, j'ignore ${slot(session)}.`,
   noCurrent: () => `${BOT_TAG} Aucun créneau d'autonomie en cours. Tape *planning* pour voir la journée.`,
 
+  fullDay: (label, courses, toSign, isDone) => `${BOT_TAG} ${fullDay(label, courses, toSign, isDone)}`,
+
   day: (label, sessions, store) => {
     if (!sessions.length) return `${BOT_TAG} 📅 ${label} : aucune autonomie. Profite ! 🌿`;
     const lines = sessions.map((s) => {
@@ -83,5 +140,18 @@ export const msg = {
   testFailed: (reason) => `${BOT_TAG} ❌ Connexion à Sowesoft impossible : ${reason}`,
   testNotification: () =>
     `${BOT_TAG} 🔔 *Notification de test*\nSi tu lis ce message, les rappels de signature arriveront bien ici. 👌\n\nRéponds *aide* pour voir ce que je sais faire.`,
+  // ── Membres de la classe (rappels seulement) ──
+  memberWelcome: (member) =>
+    `👋 Salut ${member.name} ! Tu es inscrit·e aux rappels *LinkeD*.\nJe t'écris quand il faut signer sur SoWeSoft.\n\n• *fait* : tu as signé, j'arrête de te relancer\n• *planning* : les cours du jour\n• *stop* / *reprendre* : couper / relancer les rappels`,
+  memberHelp: () =>
+    `*LinkeD* t'envoie un rappel quand il faut signer sur SoWeSoft.\n\n• *fait* : tu as signé, j'arrête de te relancer\n• *planning* : les cours du jour\n• *stop* / *reprendre* : couper / relancer les rappels`,
+  memberDone: (session) => `👍 Noté${session ? ` pour ${session.subject || session.title}` : ''}, plus de relance.`,
+  memberNoCurrent: () => `Aucun cours à signer en ce moment. Tape *planning* pour voir la journée.`,
+  memberPaused: () => `⏸️ Rappels coupés. Réponds *reprendre* pour les relancer.`,
+  memberResumed: () => `▶️ C'est reparti, je te préviens au prochain cours.`,
+  memberNoSign: () => `✍️ Je ne signe pas à ta place : signe sur l'appli SoWeSoft, puis réponds *fait*.`,
+  memberTest: (member) => `🔔 Test LinkeD : ${member.name}, tu recevras bien les rappels ici.`,
+  memberDay: (label, courses, toSign, isDone) => fullDay(label, courses, toSign, isDone),
+
   unknown: () => `${BOT_TAG} Je n'ai pas compris 🤔 Envoie un *code* (ex : 48213) ou tape *aide*.`,
 };

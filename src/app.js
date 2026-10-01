@@ -3,6 +3,8 @@ import { Store } from './store.js';
 import { Settings } from './settings.js';
 import { SowesignSigner } from './sowesign/signer.js';
 import { Bot } from './bot.js';
+import { Members } from './members.js';
+import { DEFAULT_MEMBER_TEMPLATE } from './messages.js';
 
 /**
  * Assemble les briques (planning, état, réglages, robot, bot) et applique les réglages
@@ -21,6 +23,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     notify: { mode: 'auto', subjects: [] },
     channel: config.channel || 'telegram',
     whatsappNumber: config.ownerNumber || '',
+    memberTemplate: DEFAULT_MEMBER_TEMPLATE,
     telegramToken: config.telegram?.token || '',
   });
   const s = settings.get();
@@ -34,7 +37,10 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     dataDir: config.dataDir,
   });
 
-  const channel = { send: send || (async () => {}) };
+  const members = new Members(config.dataDir);
+  members.prune();
+
+  const channel = { send: send || (async () => {}), sendToMember: async () => {} };
   const bot = new Bot({
     planning,
     store,
@@ -42,6 +48,9 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     send: (...args) => channel.send(...args),
     offsets: s.reminderOffsets,
     dryRun: s.dryRun,
+    members,
+    sendToMember: (...args) => channel.sendToMember(...args),
+    memberTemplate: s.memberTemplate,
   });
 
   function updateSettings(patch) {
@@ -50,6 +59,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     if (v.icsUrl !== before.icsUrl) { planning.icsUrl = v.icsUrl; planning.calendar = null; }
     planning.keywords = v.keywords;
     planning.notify = v.notify;
+    bot.memberTemplate = v.memberTemplate;
     bot.offsets = v.reminderOffsets;
     bot.dryRun = signer.dryRun = v.dryRun;
     signer.auth = v.auth;
@@ -59,6 +69,6 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     return settings.public();
   }
 
-  const app = { store, settings, planning, signer, bot, channel, updateSettings, onChannelSettings: null };
+  const app = { store, settings, planning, signer, bot, channel, members, updateSettings, onChannelSettings: null };
   return app;
 }

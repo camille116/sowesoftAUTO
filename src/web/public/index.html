@@ -38,6 +38,9 @@
         <a href="#planning" data-tab="planning">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
           <span>Planning</span></a>
+        <a href="#class" data-tab="class">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/></svg>
+          <span>Classe</span></a>
         <a href="#history" data-tab="history">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 4v5h5"/></svg>
           <span>Activité</span></a>
@@ -137,6 +140,64 @@
         </header>
         <div id="ics-alert" class="banner banner-danger" hidden></div>
         <div id="planning-list" class="day-list"></div>
+      </section>
+
+      <!-- ═══ CLASSE ═══ -->
+      <section class="view" data-view="class" hidden>
+        <header class="page-head">
+          <div><p class="crumb">Rappels Telegram</p><h1>Classe</h1></div>
+          <div class="kpi-inline mono" id="class-count">—</div>
+        </header>
+        <div id="class-alert" class="banner" hidden></div>
+
+        <div class="settings-grid">
+          <div class="stack">
+            <article class="card stack">
+              <div class="section-head">
+                <h3>Ajouter un membre</h3>
+                <p class="muted small">Ses rappels arrivent sur Telegram. Il ne peut que gérer ses propres rappels, rien d'autre.</p>
+              </div>
+              <form id="member-form" class="grid-2 member-form">
+                <label class="field"><span>Prénom</span><input name="name" maxlength="60" required autocomplete="off"></label>
+                <label class="field"><span>Téléphone</span><input name="phone" inputmode="tel" class="mono" placeholder="06 12 34 56 78" required autocomplete="off"></label>
+                <button class="btn btn-primary" type="submit">Ajouter</button>
+              </form>
+            </article>
+
+            <article class="card stack">
+              <div class="section-head">
+                <h3>Inviter la classe</h3>
+                <p class="muted small">Envoie ce message dans le groupe de classe. Chacun ouvre le bot, appuie sur <b>Démarrer</b> puis <b>Partager mon numéro</b> : s'il est dans ta liste, il est inscrit.</p>
+              </div>
+              <div class="panel share-box">
+                <p id="share-text" class="small">—</p>
+                <button class="btn btn-ghost btn-sm" type="button" id="share-copy">Copier le message</button>
+              </div>
+            </article>
+          </div>
+
+          <article class="card stack">
+            <div class="section-head">
+              <h3>Message de rappel</h3>
+              <p class="muted small">Ce que reçoivent tes camarades à chaque rappel. Clique sur une variable pour l'insérer.</p>
+            </div>
+            <div class="chips" id="template-vars"></div>
+            <textarea id="member-template" class="textarea mono" rows="6" maxlength="1000" spellcheck="false"></textarea>
+            <div class="preview">
+              <p class="eyebrow">Aperçu Telegram</p>
+              <div class="bubble" id="template-preview">—</div>
+            </div>
+            <div class="row">
+              <button class="btn btn-primary" type="button" id="template-save">Enregistrer</button>
+              <button class="btn btn-ghost" type="button" id="template-reset">Message par défaut</button>
+            </div>
+          </article>
+        </div>
+
+        <article class="card" style="padding:0">
+          <div class="table-head"><h3>Membres</h3><input id="member-search" class="input input-sm" placeholder="Rechercher…" aria-label="Rechercher un membre"></div>
+          <ul id="member-list" class="member-list"></ul>
+        </article>
       </section>
 
       <!-- ═══ ACTIVITÉ ═══ -->

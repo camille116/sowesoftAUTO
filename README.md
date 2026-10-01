@@ -6,7 +6,7 @@
 2. **te rappelle de signer** sur Telegram (ou WhatsApp) pour les cours que tu choisis : autonomie et e-learning, tous les cours, ou une sélection de matières ;
 3. **signe à ta place** quand tu lui envoies le code à 5 chiffres, et te renvoie la capture SoWeSoft comme preuve.
 
-Tout se pilote depuis **l'app LinkeD** (tableau de bord, planning, activité, réglages), installée sur ton Mac comme une application normale, avec un bouton **« Mettre à jour »**.
+Tout se pilote depuis **l'app LinkeD** (tableau de bord, planning, classe, activité, réglages) : une vraie app Mac (Electron, comme Spotify), avec un bouton **« Mettre à jour »**. Tu es le seul admin, et tu peux **inscrire tes camarades** pour qu'ils reçoivent eux aussi les rappels sur Telegram.
 
 ```
  Hyperplanning ─┐                          ┌──────────────┐
@@ -50,7 +50,8 @@ Avec Docker : `docker compose up -d --build`.
 |---|---|
 | **Tableau de bord** | Session en cours (à signer / signé), indicateurs du jour et du mois, **code à 5 cases + « Signer maintenant »**, cours du jour, test de notification, pause des rappels |
 | **Planning** | Tes cours notifiés sur 7 ou 30 jours, avec leur statut et leur type (AUTONOMIE, CRS, ELEARNING…) ; « Fait » ou « Ignorer » |
-| **Activité** | Rappels, signatures (avec la capture SoWeSoft), erreurs |
+| **Classe** | Ajouter un camarade (prénom + numéro), message d'invitation à copier, statut de chacun, notif test, pause, retrait ; **message de rappel modifiable** avec variables et aperçu Telegram |
+| **Activité** | Rappels, signatures (avec la capture SoWeSoft), arrivées de la classe, erreurs |
 | **Réglages** | Messagerie (bot Telegram ou WhatsApp), **cours notifiés**, moments des rappels, compte SoWeSoft, mode test, agenda, **mise à jour** |
 
 ### Choisir les cours notifiés
@@ -59,6 +60,14 @@ Réglages → **Notifications** :
 - **Autonomie & e-learning** (par défaut) : les créneaux dont le type contient un mot-clé (`autonomie`, `elearning`…) ;
 - **Tous les cours** ;
 - **Sélection** : la liste des matières de ton Hyperplanning (60 prochains jours) s'affiche avec leurs types, et tu coches celles que tu veux.
+
+### La classe
+
+1. Classe → **Ajouter un membre** : prénom et numéro.
+2. Copie le **message d'invitation** dans le groupe de classe. Chacun ouvre le bot, appuie sur **Démarrer**, puis sur **📱 Partager mon numéro** : si son numéro est dans ta liste, il est inscrit. Un bot Telegram ne peut pas écrire en premier à un numéro, c'est la seule façon de faire.
+3. Il reçoit les rappels avec **ton message** (variables `{prenom}`, `{cours}`, `{debut}`, `{fin}`, `{type}`, `{date}`, `{moment}`), répond *fait* quand c'est signé, *planning* ou *demain* pour voir les cours et les salles, *stop* pour arrêter.
+
+LinkeD ne signe que pour toi : les membres reçoivent seulement les rappels.
 
 ### Mise à jour
 
@@ -85,7 +94,8 @@ Le bot Telegram ne répond qu'au compte relié avec le code de l'app : les autre
 | `48213` · `code 48213` | Signe avec ce code et renvoie la capture ✅ |
 | `fait` | Note que tu as signé toi-même, arrête les rappels |
 | `ignore` | Ignore le créneau en cours |
-| `planning` · `demain` · `semaine` | Liste tes créneaux (✅ / ⬜) |
+| `planning` · `demain` | Tous les cours du jour avec **salle, bâtiment et campus** (⬜ à signer · ✅ signé) |
+| `semaine` | Les cours à signer des 7 prochains jours |
 | `statut` · `pause` · `reprendre` · `test` · `aide` | Statut, couper ou relancer les rappels, tester SoWeSoft, aide |
 
 ---
@@ -112,7 +122,7 @@ Le bot Telegram ne répond qu'au compte relié avec le code de l'app : les autre
 ## 🧪 Développement
 
 ```bash
-npm test     # 55 tests : planning, rappels, bot, Telegram, WhatsApp, API, sécurité, mises à jour, parcours SoWeSoft dans Chromium
+npm test     # 63 tests : planning, rappels, bot, Telegram, WhatsApp, API, sécurité, mises à jour, parcours SoWeSoft dans Chromium
 npm run demo
 ```
 
@@ -122,13 +132,15 @@ src/
 ├── app.js              assemblage + réglages appliqués à chaud
 ├── bot.js              logique du bot (indépendante de la messagerie)
 ├── settings.js         réglages modifiables depuis l'app (data/settings.json)
-├── telegram.js         canal Telegram (API officielle, long polling)
+├── telegram.js         canal Telegram (API officielle, long polling) : admin + classe
+├── members.js          membres de la classe (data/members.json)
 ├── whatsapp.js         canal WhatsApp (whatsapp-web.js)
 ├── updater.js          vérification et installation des mises à jour
 ├── planning/           agenda ICS (matières, types, sélection) + planning manuel
 ├── sowesign/           robot de signature SoWeSoft + connexion manuelle
 └── web/                serveur + API (server.js), interface (public/), démo
-scripts/mac/            install.sh · update.sh · make-app.sh (LinkeD.app) · uninstall.sh
+desktop/                app Mac (Electron) : fenêtre, Dock, menus
+scripts/mac/            install.sh · update.sh · make-app.sh (LinkeD.app) · LinkeD (service) · uninstall.sh
 ```
 
 ---
