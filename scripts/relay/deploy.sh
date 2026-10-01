@@ -45,15 +45,24 @@ fi
 printf '%s' "$DEPLOY_OUT" | grep -qiE 'success|deployed|uploaded|workers\.dev' || die "La mise en ligne a échoué (voir ci-dessus)."
 URL="$(printf '%s' "$DEPLOY_OUT" | grep -oiE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)"
 
-# 4. Clé secrète (le Worker existe maintenant : on peut la poser), partagée entre le Mac et le relais
+# 4. Clé secrète, partagée entre le Mac et le relais.
+# Si une clé existe déjà (redéploiement), on la GARDE : ta configuration dans LinkeD reste valable.
 bold "🔑 Clé de sécurité…"
-SECRET="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
-printf '%s' "$SECRET" | $WRANGLER secret put RELAY_SECRET $CFG >/dev/null 2>&1 \
-  || die "Impossible d'enregistrer la clé. Relance la commande."
-echo "   clé enregistrée"
+if $WRANGLER secret list $CFG 2>/dev/null | grep -q RELAY_SECRET; then
+  echo "   clé existante conservée"
+  bold "✅ Relais à jour !"
+  cat <<TXT
 
-bold "✅ Relais en ligne !"
-cat <<TXT
+  Ton relais est à jour. Rien à recoller : garde l'URL et la clé déjà dans LinkeD.
+    URL : ${URL:-'(voir « Uploaded » ci-dessus, se termine par .workers.dev)'}
+TXT
+else
+  SECRET="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
+  printf '%s' "$SECRET" | $WRANGLER secret put RELAY_SECRET $CFG >/dev/null 2>&1 \
+    || die "Impossible d'enregistrer la clé. Relance la commande."
+  echo "   clé enregistrée"
+  bold "✅ Relais en ligne !"
+  cat <<TXT
 
   Dans LinkeD → Réglages → Relais cloud, colle :
 
@@ -63,3 +72,4 @@ cat <<TXT
   Puis clique sur « Activer ». Le relais enverra les rappels quand ton Mac est éteint.
   (Note bien la clé : elle ne sera plus affichée.)
 TXT
+fi
