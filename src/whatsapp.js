@@ -26,7 +26,14 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
   const ownerJid = `${ownerNumber}@c.us`;
   const sentIds = new Set(); // évite que le bot se réponde à lui-même dans la discussion « Moi »
 
+  // état affiché dans l'appli web : starting → qr → ready (ou disconnected)
+  const state = { status: 'starting', qr: null };
+
   async function send(text, imagePath) {
+    if (state.status !== 'ready') {
+      log.warn('WhatsApp pas encore connecté, message non envoyé');
+      return;
+    }
     const sent = imagePath
       ? await client.sendMessage(ownerJid, MessageMedia.fromFilePath(imagePath), { caption: text })
       : await client.sendMessage(ownerJid, text);
@@ -45,16 +52,19 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
   }
 
   client.on('qr', (qr) => {
+    Object.assign(state, { status: 'qr', qr });
     log.info('Scanne ce QR code avec WhatsApp → Appareils connectés → Connecter un appareil');
     qrcode.generate(qr, { small: true });
   });
   client.on('authenticated', () => log.info('WhatsApp authentifié'));
   client.on('auth_failure', (m) => log.error(`Échec d'authentification WhatsApp : ${m}`));
   client.on('disconnected', (reason) => {
+    Object.assign(state, { status: 'disconnected', qr: null });
     log.warn(`WhatsApp déconnecté (${reason}), reconnexion…`);
     client.initialize().catch((e) => log.error(e));
   });
   client.on('ready', () => {
+    Object.assign(state, { status: 'ready', qr: null });
     log.info('WhatsApp prêt');
     onReady?.();
   });
@@ -70,5 +80,5 @@ export function createWhatsApp({ ownerNumber, dataDir, browser, onMessage, onRea
     }
   });
 
-  return { client, send, start: () => client.initialize() };
+  return { client, send, state, start: () => client.initialize() };
 }

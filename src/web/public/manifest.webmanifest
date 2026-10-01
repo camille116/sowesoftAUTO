@@ -1,0 +1,13 @@
+{
+  "name": "Émile – émargement SoWeSoft",
+  "short_name": "Émile",
+  "description": "Rappels et signature SoWeSoft pendant tes heures d'autonomie",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f2ee",
+  "theme_color": "#14213d",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

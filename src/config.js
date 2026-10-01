@@ -54,6 +54,12 @@ export const config = {
     dryRun: bool(env.SIGN_DRY_RUN, true),
   },
 
+  web: {
+    port: Number(env.WEB_PORT || 3000),
+    host: env.WEB_HOST || '',
+    password: env.WEB_PASSWORD || '',
+  },
+
   browser: {
     headless: bool(env.HEADLESS, true),
     executablePath: env.CHROME_PATH || undefined,

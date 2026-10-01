@@ -18,4 +18,5 @@ COPY config ./config
 
 # sessions WhatsApp / SoWeSign, état des signatures, captures
 VOLUME /app/data
+EXPOSE 3000
 CMD ["node", "src/index.js"]

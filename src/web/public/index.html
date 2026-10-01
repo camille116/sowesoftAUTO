@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Émile</title>
+  <meta name="description" content="Ton assistant d'émargement SoWeSoft">
+  <meta name="theme-color" content="#14213d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Connexion à l'appli -->
+  <section id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <img src="icon.svg" alt="" class="login-logo" width="64" height="64">
+      <h1 class="brand">Émile</h1>
+      <p class="muted">Tu bosses, Émile veille sur ta signature.</p>
+      <label class="field">
+        <span>Mot de passe de l'appli</span>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-block" type="submit">Entrer</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="shell" class="shell" hidden>
+    <header class="topbar">
+      <div class="topbar-brand">
+        <img src="icon.svg" alt="" width="32" height="32">
+        <span class="brand">Émile</span>
+      </div>
+      <div class="topbar-status">
+        <span id="pill-whatsapp" class="pill" title="WhatsApp">WhatsApp</span>
+        <span id="pill-mode" class="pill" title="Mode de signature">—</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- ACCUEIL -->
+      <section class="view" data-view="home">
+        <div id="alert-login" class="banner banner-danger" hidden></div>
+
+        <article class="card card-hero">
+          <p class="eyebrow" id="hero-eyebrow">En ce moment</p>
+          <h2 id="hero-title">Pas d'autonomie en cours</h2>
+          <p id="hero-meta" class="muted"></p>
+          <div id="hero-progress" class="progress" hidden><span></span></div>
+        </article>
+
+        <form id="sign-form" class="card sign-card" autocomplete="off">
+          <label for="code" class="sign-label">Code du cours</label>
+          <div class="code-wrap">
+            <input id="code" name="code" inputmode="numeric" pattern="\d{5}" maxlength="5" placeholder="•••••"
+                   aria-describedby="code-help" required>
+          </div>
+          <p id="code-help" class="muted small">Les 5 chiffres donnés par l'intervenant·e.</p>
+          <button id="sign-btn" class="btn btn-primary btn-block btn-lg" type="submit">
+            <span class="btn-label">Signer pour moi</span>
+          </button>
+          <div id="sign-result" class="result" hidden></div>
+        </form>
+
+        <div class="grid-2">
+          <article class="card">
+            <p class="eyebrow">Prochain créneau</p>
+            <h3 id="next-title">—</h3>
+            <p id="next-meta" class="muted"></p>
+          </article>
+          <article class="card">
+            <p class="eyebrow">Rappels WhatsApp</p>
+            <label class="switch">
+              <input type="checkbox" id="toggle-reminders">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span id="reminders-label">Actifs</span>
+            </label>
+            <p class="muted small">Coupe-les pendant les vacances.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PLANNING -->
+      <section class="view" data-view="planning" hidden>
+        <div class="view-head">
+          <h2>Planning</h2>
+          <div class="segmented" role="tablist" id="planning-range">
+            <button role="tab" data-days="7" aria-selected="true">7 jours</button>
+            <button role="tab" data-days="31">Mois</button>
+          </div>
+        </div>
+        <p class="muted small">Tes heures d'autonomie et d'e-learning, lues dans Hyperplanning.</p>
+        <div id="planning-list" class="day-list"></div>
+      </section>
+
+      <!-- HISTORIQUE -->
+      <section class="view" data-view="history" hidden>
+        <div class="view-head"><h2>Historique</h2></div>
+        <ol id="history-list" class="timeline"></ol>
+      </section>
+
+      <!-- RÉGLAGES -->
+      <section class="view" data-view="settings" hidden>
+        <div class="view-head"><h2>Réglages</h2></div>
+
+        <article class="card" id="whatsapp-card">
+          <h3>WhatsApp</h3>
+          <p id="wa-text" class="muted">—</p>
+          <img id="wa-qr" alt="QR code à scanner avec WhatsApp" hidden width="240" height="240">
+          <ol id="wa-steps" class="steps small" hidden>
+            <li>Ouvre WhatsApp sur ton téléphone</li>
+            <li>Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
+            <li>Scanne ce QR code</li>
+          </ol>
+        </article>
+
+        <form id="settings-form" class="card stack">
+          <h3>Connexion SoWeSoft</h3>
+          <div class="segmented segmented-full" id="method" role="radiogroup" aria-label="Méthode de connexion">
+            <button type="button" role="radio" data-method="password">E-mail</button>
+            <button type="button" role="radio" data-method="code">ID + PIN</button>
+            <button type="button" role="radio" data-method="sso">Microsoft</button>
+          </div>
+          <label class="field">
+            <span>Code établissement</span>
+            <input name="institution" inputmode="numeric" maxlength="4" pattern="\d{4}">
+          </label>
+          <div data-for="password" class="stack">
+            <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="username"></label>
+            <label class="field"><span>Mot de passe SoWeSoft</span>
+              <input name="password" type="password" autocomplete="new-password" placeholder="•••••• (inchangé)"></label>
+          </div>
+          <div data-for="code" class="grid-2">
+            <label class="field"><span>Identifiant (8 chiffres)</span><input name="id" inputmode="numeric" maxlength="8"></label>
+            <label class="field"><span>PIN (4 chiffres)</span>
+              <input name="pin" type="password" inputmode="numeric" maxlength="4" placeholder="•••• (inchangé)"></label>
+          </div>
+          <p data-for="sso" class="muted small">Lance <code>npm run sowesign:login</code> sur la machine du bot et connecte-toi avec Microsoft. La session dure environ 25 jours.</p>
+
+          <h3>Signature</h3>
+          <label class="switch">
+            <input type="checkbox" name="dryRun">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span>Mode test <span class="muted small">(tape 4 chiffres sur 5, n'envoie rien)</span></span>
+          </label>
+
+          <h3>Rappels</h3>
+          <label class="field">
+            <span>Minutes par rapport au début du créneau</span>
+            <input name="reminderOffsets" placeholder="-5, 0, 15, 45">
+            <small class="muted">-5 = 5 min avant · 0 = au début · 15 = 15 min après</small>
+          </label>
+          <label class="field">
+            <span>Mots-clés des créneaux à signer</span>
+            <input name="keywords" placeholder="autonomie, elearning">
+          </label>
+          <label class="field">
+            <span>Lien iCal Hyperplanning</span>
+            <input name="icsUrl" type="url" placeholder="https://…/Telechargements/ical/…ics?…">
+          </label>
+
+          <div class="row">
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+            <button class="btn btn-ghost" type="button" id="test-btn">Tester la connexion SoWeSoft</button>
+          </div>
+          <div id="settings-result" class="result" hidden></div>
+        </form>
+
+        <p class="muted small center">Ne signe que lorsque tu es vraiment en cours : l'émargement atteste ta présence.</p>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Navigation">
+      <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></a>
+      <a href="#planning" data-tab="planning"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg><span>Planning</span></a>
+      <a href="#history" data-tab="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4"/></svg><span>Historique</span></a>
+      <a href="#settings" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Réglages</span></a>
+    </nav>
+  </div>
+
+  <dialog id="lightbox" class="lightbox">
+    <form method="dialog"><button class="btn btn-ghost lightbox-close" aria-label="Fermer">✕</button></form>
+    <img id="lightbox-img" alt="Capture SoWeSoft">
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

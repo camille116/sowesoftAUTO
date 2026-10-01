@@ -6,6 +6,8 @@
 2. **t'envoie un message quand tu dois signer** sur Sowesoft / SoWeSign, et te relance tant que ce n'est pas fait ;
 3. **signe à ta place** quand tu lui envoies le code de cours à 5 chiffres (`48213`), puis te renvoie une capture d'écran comme preuve.
 
+Le tout se pilote depuis **l'appli Émile** : une interface web installable sur ton téléphone.
+
 > Le dossier de cadrage du projet (persona, parcours, ton de marque, architecture, roadmap) est dans [`docs/CADRAGE.md`](docs/CADRAGE.md).
 
 ```
@@ -29,7 +31,7 @@ git clone https://github.com/camille116/sowesoftAUTO.git
 cd sowesoftAUTO
 cp .env.example .env        # puis remplis le fichier (voir ci-dessous)
 npm install
-npm start                   # un QR code s'affiche
+npm start                   # un QR code s'affiche (aussi dans l'appli → Réglages)
 ```
 
 Scanne le QR code depuis WhatsApp → **Appareils connectés → Connecter un appareil**. La session est mémorisée dans `data/`, tu ne le fais qu'une fois.
@@ -50,6 +52,26 @@ docker compose logs -f      # pour scanner le QR code la 1re fois
 | **Un 2e numéro** (plus propre) | SIM/eSIM dédiée ou WhatsApp Business | Une discussion normale avec « Émile » |
 
 Dans les deux cas, renseigne **ton** numéro dans `OWNER_NUMBER` : le bot ignore tous les autres.
+
+---
+
+## 📱 L'appli Émile
+
+Dès que le bot tourne, ouvre **http://localhost:3000** sur la machine du bot. Depuis ton téléphone, sur le même Wi-Fi, ouvre `http://<ip-de-la-machine>:3000`.
+
+| Écran | Ce que tu y fais |
+|---|---|
+| **Accueil** | Voir le créneau en cours (rouge = à signer, vert = signé), **taper le code et signer** en un bouton, couper/relancer les rappels |
+| **Planning** | Tes autonomies et e-learnings sur 7 jours ou un mois, avec leur statut ; marquer « signé moi-même » ou « ignorer » |
+| **Historique** | Rappels envoyés, signatures (avec la capture SoWeSoft en grand), erreurs |
+| **Réglages** | **QR code WhatsApp** à scanner, identifiants SoWeSoft, mode test, horaires des rappels, mots-clés, lien iCal, bouton « Tester la connexion » |
+
+- **Mot de passe** : définis `WEB_PASSWORD` dans `.env` pour ouvrir l'appli aux autres appareils de ton réseau. Sans mot de passe, elle n'est accessible que depuis la machine du bot.
+- **Installer sur le téléphone** : ouvre l'appli dans Safari ou Chrome, puis « Ajouter à l'écran d'accueil ».
+- Ce que tu modifies dans **Réglages** est enregistré dans `data/settings.json`, jamais commité, et prend le dessus sur `.env`.
+- **Démo sans rien configurer** : `npm run demo`, puis ouvre http://localhost:3000 (mot de passe `demo` ; le code `00000` simule un échec).
+
+> Pour y accéder depuis l'extérieur (4G), ne mets pas l'appli directement sur Internet : passe par un tunnel privé comme [Tailscale](https://tailscale.com) (gratuit), qui relie ton téléphone et la machine du bot.
 
 ---
 
@@ -139,7 +161,7 @@ toi : 48213
 ## 🧪 Développement
 
 ```bash
-npm test     # 26 tests : commandes, planning ICS/manuel, rappels, bot, et parcours SoWeSoft complet dans Chromium
+npm test     # 34 tests : commandes, planning, rappels, bot, API de l'appli, et parcours SoWeSoft complet dans Chromium
 ```
 
 Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui reproduit la structure de la vraie (`test/fixtures/mock-sowesign.js`). Définis `CHROME_PATH` si Chromium n'est pas trouvé ; sinon ce test est ignoré.
@@ -148,7 +170,10 @@ Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui
 src/
 ├── index.js            point d'entrée
 ├── bot.js              logique du bot (indépendante de WhatsApp)
+├── app.js              assemblage + réglages appliqués à chaud
+├── settings.js         réglages modifiables depuis l'appli
 ├── whatsapp.js         canal WhatsApp (whatsapp-web.js)
+├── web/                appli : serveur + API (server.js), interface (public/), démo
 ├── commands.js         compréhension des messages
 ├── messages.js         textes du bot (ton de marque)
 ├── reminders.js        calcul des rappels

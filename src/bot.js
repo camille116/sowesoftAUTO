@@ -1,11 +1,13 @@
+import { basename } from 'node:path';
 import { parseCommand } from './commands.js';
 import { dueReminders } from './reminders.js';
 import { msg } from './messages.js';
 import { log } from './logger.js';
 
 /**
- * Cerveau du bot, indépendant de WhatsApp :
- * `send(text, imagePath?)` est fourni par le canal (WhatsApp en prod, faux canal en test).
+ * Cerveau du bot, indépendant du canal :
+ * `send(text, imagePath?)` est fourni par WhatsApp en prod (ou un faux canal en test),
+ * et l'appli web appelle directement les mêmes méthodes (sign, markDone, skip…).
  */
 export class Bot {
   constructor({ planning, store, signer, send, offsets, dryRun }) {
@@ -24,6 +26,7 @@ export class Bot {
     for (const reminder of dueReminders(sessions, this.store, this.offsets, now)) {
       await this.send(msg.reminder(reminder));
       this.store.update(reminder.session.id, { reminderIndex: reminder.index });
+      this.store.log('reminder', { title: reminder.session.title, offset: reminder.offset });
       log.info(`Rappel envoyé (${reminder.offset} min) pour ${reminder.session.title}`);
     }
   }
@@ -46,36 +49,71 @@ export class Bot {
       case 'done': {
         const current = await this.planning.current(now);
         if (!current) return this.send(msg.noCurrent());
-        this.store.markSigned(current.id, 'manuel');
+        this.markDone(current);
         return this.send(msg.markedDone(current));
       }
       case 'skip': {
         const current = await this.planning.current(now);
         if (!current) return this.send(msg.noCurrent());
-        this.store.markSkipped(current.id);
+        this.skip(current);
         return this.send(msg.skipped(current));
       }
-      case 'pause': this.store.setPaused(true); return this.send(msg.paused());
-      case 'resume': this.store.setPaused(false); return this.send(msg.resumed());
+      case 'pause': this.setPaused(true); return this.send(msg.paused());
+      case 'resume': this.setPaused(false); return this.send(msg.resumed());
       case 'test': return this.test();
       default: return this.send(msg.unknown());
     }
   }
 
-  async sign(code, now) {
-    if (this.signer.busy) return this.send(msg.signBusy());
+  markDone(session) {
+    this.store.markSigned(session.id, 'manuel');
+    this.store.log('done', { title: session.title });
+  }
+
+  skip(session) {
+    this.store.markSkipped(session.id);
+    this.store.log('skip', { title: session.title });
+  }
+
+  setPaused(value) {
+    this.store.setPaused(value);
+    this.store.log(value ? 'pause' : 'resume');
+  }
+
+  /** Signe et renvoie le résultat (utilisé par WhatsApp et par l'appli web). */
+  async sign(code, now = new Date()) {
+    if (this.signer.busy) {
+      await this.send(msg.signBusy());
+      return { ok: false, busy: true };
+    }
     await this.send(msg.signing(code));
 
     const result = await this.signer.sign(code);
-    if (result.busy) return this.send(msg.signBusy());
+    if (result.busy) {
+      await this.send(msg.signBusy());
+      return result;
+    }
 
-    if (result.dryRun) return this.send(msg.dryRun(code), result.screenshot);
-    if (!result.ok) return this.send(msg.signFailed(result.reason), result.screenshot);
-
-    // signature OK : on la rattache au créneau en cours, s'il y en a un
     const current = await this.planning.current(now);
-    if (current) this.store.markSigned(current.id, 'bot');
-    return this.send(result.already ? msg.alreadySigned(current) : msg.signed(current), result.screenshot);
+    const entry = {
+      code: result.dryRun ? `${String(code).slice(0, -1)}•` : String(code),
+      title: current?.title,
+      ok: result.ok,
+      dryRun: Boolean(result.dryRun),
+      already: Boolean(result.already),
+      reason: result.reason,
+      screenshot: result.screenshot ? basename(result.screenshot) : undefined,
+    };
+    this.store.log('sign', entry);
+
+    if (result.dryRun) await this.send(msg.dryRun(code), result.screenshot);
+    else if (!result.ok) await this.send(msg.signFailed(result.reason), result.screenshot);
+    else {
+      // signature OK : on la rattache au créneau en cours, s'il y en a un
+      if (current) this.store.markSigned(current.id, 'bot');
+      await this.send(result.already ? msg.alreadySigned(current) : msg.signed(current), result.screenshot);
+    }
+    return { ...result, session: current };
   }
 
   async status(now) {
@@ -88,8 +126,9 @@ export class Bot {
   async test() {
     await this.send(msg.testing());
     const result = await this.signer.check();
-    return result.ok
-      ? this.send(msg.testOk(), result.screenshot)
-      : this.send(msg.testFailed(result.reason), result.screenshot);
+    this.store.log('test', { ok: result.ok, reason: result.reason, screenshot: result.screenshot ? basename(result.screenshot) : undefined });
+    if (result.ok) await this.send(msg.testOk(), result.screenshot);
+    else await this.send(msg.testFailed(result.reason), result.screenshot);
+    return result;
   }
 }

@@ -6,7 +6,12 @@ services:
     env_file: .env
     environment:
       CHROME_PATH: /usr/bin/chromium
+      WEB_HOST: 0.0.0.0
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
+    ports:
+      # appli Émile, accessible seulement depuis cette machine.
+      # Pour l'ouvrir à ton téléphone : mets WEB_PASSWORD dans .env et remplace par "3000:3000"
+      - "127.0.0.1:3000:3000"
     shm_size: 512mb

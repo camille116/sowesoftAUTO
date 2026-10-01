@@ -1,0 +1,368 @@
+// Émile – interface web (sans framework). Parle à l'API de src/web/server.js.
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtDay = (iso) => new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+const fmtShort = (iso) => new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtWhen = (iso) => {
+  const d = new Date(iso);
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? `aujourd'hui ${fmtTime(iso)}` : `${fmtShort(iso)} ${fmtTime(iso)}`;
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== '/api/login') { showLogin(); throw new Error('Connexion requise'); }
+  if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+  return data;
+}
+
+let toastTimer;
+function toast(text) {
+  const t = $('#toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function openShot(name) {
+  $('#lightbox-img').src = `/api/screenshots/${encodeURIComponent(name)}`;
+  $('#lightbox').showModal();
+}
+document.addEventListener('click', (e) => {
+  const shot = e.target.closest('[data-shot]');
+  if (shot) openShot(shot.dataset.shot);
+});
+
+// ── Navigation ────────────────────────────────────────────
+const views = ['home', 'planning', 'history', 'settings'];
+function route() {
+  const name = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  $$('.view').forEach((v) => (v.hidden = v.dataset.view !== name));
+  $$('.tabbar a').forEach((a) => {
+    if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  ({ home: loadStatus, planning: loadPlanning, history: loadHistory, settings: loadSettings })[name]();
+}
+window.addEventListener('hashchange', route);
+
+// ── Connexion à l'appli ───────────────────────────────────
+function showLogin() {
+  $('#shell').hidden = true;
+  $('#login').hidden = false;
+  $('#login-password').focus();
+}
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#login-error').textContent = '';
+  try {
+    await api('/api/login', { password: $('#login-password').value });
+    start();
+  } catch (err) {
+    $('#login-error').textContent = err.message;
+  }
+});
+
+// ── Accueil ───────────────────────────────────────────────
+const WA = {
+  ready: ['WhatsApp connecté', 'ok'], qr: ['WhatsApp à connecter', 'warn'], starting: ['WhatsApp démarre', 'warn'],
+  disconnected: ['WhatsApp déconnecté', 'danger'], off: ['WhatsApp coupé', ''],
+};
+
+async function loadStatus() {
+  let s;
+  try { s = await api('/api/status'); } catch { return; }
+
+  const [waText, waClass] = WA[s.whatsapp] || WA.off;
+  const pillWa = $('#pill-whatsapp');
+  pillWa.textContent = waText;
+  pillWa.className = `pill ${waClass}`;
+  const pillMode = $('#pill-mode');
+  pillMode.textContent = s.dryRun ? 'Mode test' : 'Signature réelle';
+  pillMode.className = `pill ${s.dryRun ? 'warn' : 'ok'}`;
+
+  const banner = $('#alert-login');
+  banner.hidden = !s.loginLocked;
+  if (s.loginLocked) banner.innerHTML = `<b>Connexion SoWeSoft suspendue</b> après un échec (${esc(s.loginLocked)}). Vérifie tes identifiants dans <a href="#settings">Réglages</a>, puis teste la connexion.`;
+
+  const hero = $('.card-hero');
+  hero.classList.remove('is-todo', 'is-done');
+  const progress = $('#hero-progress');
+  if (s.current) {
+    const done = s.current.status === 'signed' || s.current.status === 'skipped';
+    hero.classList.add(done ? 'is-done' : 'is-todo');
+    $('#hero-eyebrow').textContent = done ? 'En ce moment · signé ✓' : 'En ce moment · à signer';
+    $('#hero-title').textContent = s.current.title;
+    const left = Math.max(0, Math.round((new Date(s.current.end) - Date.now()) / 60000));
+    $('#hero-meta').textContent = `${fmtTime(s.current.start)} – ${fmtTime(s.current.end)} · encore ${left} min`;
+    const total = new Date(s.current.end) - new Date(s.current.start);
+    progress.hidden = false;
+    progress.firstElementChild.style.width = `${Math.min(100, ((Date.now() - new Date(s.current.start)) / total) * 100)}%`;
+  } else {
+    $('#hero-eyebrow').textContent = 'En ce moment';
+    $('#hero-title').textContent = "Pas d'autonomie en cours";
+    $('#hero-meta').textContent = 'Tu peux quand même signer si un code t’a été donné.';
+    progress.hidden = true;
+  }
+
+  $('#next-title').textContent = s.next ? s.next.title : 'Rien de prévu';
+  $('#next-meta').textContent = s.next ? `${fmtDay(s.next.start)} · ${fmtTime(s.next.start)} – ${fmtTime(s.next.end)}` : 'dans les 14 prochains jours';
+
+  $('#toggle-reminders').checked = !s.paused;
+  $('#reminders-label').textContent = s.paused ? 'En pause' : 'Actifs';
+}
+
+$('#code').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5);
+});
+
+function renderResult(el, r, { okText, testText }) {
+  el.hidden = false;
+  el.className = `result ${r.dryRun ? 'is-test' : r.ok ? 'is-ok' : 'is-error'}`;
+  const title = r.dryRun ? testText : r.ok ? okText : 'Ça n’a pas marché';
+  const text = r.dryRun
+    ? 'J’ai tapé les 4 premiers chiffres et je me suis arrêté. Vérifie la capture, puis désactive le mode test dans Réglages.'
+    : r.ok ? 'SoWeSoft a confirmé. Une copie t’est envoyée sur WhatsApp.' : `${r.reason || 'Erreur inconnue'}. Signe à la main sur SoWeSoft si besoin.`;
+  el.innerHTML = `
+    <div class="row" style="align-items:flex-start;flex-wrap:nowrap">
+      ${r.screenshot ? `<img class="thumb" src="/api/screenshots/${encodeURIComponent(r.screenshot)}" data-shot="${esc(r.screenshot)}" alt="Capture SoWeSoft">` : ''}
+      <div><strong>${esc(title)}</strong><p class="small">${esc(text)}</p></div>
+    </div>`;
+}
+
+$('#sign-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = $('#code').value;
+  if (!/^\d{5}$/.test(code)) return toast('Le code fait 5 chiffres');
+  const btn = $('#sign-btn');
+  btn.disabled = true;
+  btn.classList.add('is-loading');
+  btn.querySelector('.btn-label').textContent = 'Signature en cours';
+  try {
+    const r = await api('/api/sign', { code });
+    if (r.busy) toast('Une signature est déjà en cours');
+    else renderResult($('#sign-result'), r, { okText: r.already ? 'Déjà signé ✓' : 'Signé ✓', testText: 'Mode test réussi' });
+    if (r.ok && !r.dryRun) $('#code').value = '';
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.querySelector('.btn-label').textContent = 'Signer pour moi';
+    loadStatus();
+  }
+});
+
+$('#toggle-reminders').addEventListener('change', async (e) => {
+  try {
+    await api('/api/pause', { paused: !e.target.checked });
+    toast(e.target.checked ? 'Rappels réactivés' : 'Rappels en pause');
+    loadStatus();
+  } catch (err) { toast(err.message); }
+});
+
+// ── Planning ──────────────────────────────────────────────
+let planningDays = 7;
+const STATUS = { signed: 'Signé', pending: 'À signer', missed: 'Non signé', skipped: 'Ignoré' };
+
+async function loadPlanning() {
+  const list = $('#planning-list');
+  let data;
+  try { data = await api(`/api/planning?days=${planningDays}`); } catch { return; }
+  if (!data.sessions.length) {
+    list.innerHTML = '<div class="empty card"><b>🌿</b>Aucune autonomie sur la période.</div>';
+    return;
+  }
+  const days = new Map();
+  for (const s of data.sessions) {
+    const key = new Date(s.start).toDateString();
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(s);
+  }
+  list.innerHTML = [...days.values()].map((slots) => `
+    <section class="day">
+      <h3>${esc(fmtDay(slots[0].start))}</h3>
+      ${slots.map((s) => `
+        <div class="slot ${s.current ? 'is-current' : ''}" data-id="${s.id}">
+          <div class="slot-time">${fmtTime(s.start)}<span>${fmtTime(s.end)}</span></div>
+          <div>
+            <div class="slot-title">${esc(s.title)}</div>
+            <span class="status status-${s.status}">${STATUS[s.status]}${s.signedBy === 'bot' ? ' par Émile' : ''}</span>
+          </div>
+          <div class="slot-actions">
+            ${s.status === 'pending' || s.status === 'missed'
+              ? `<button class="icon-btn" data-action="done" title="J'ai signé moi-même" aria-label="Marquer comme signé">✓</button>
+                 <button class="icon-btn" data-action="skip" title="Pas besoin de signer" aria-label="Ignorer">⤼</button>`
+              : `<button class="icon-btn" data-action="reset" title="Annuler" aria-label="Annuler">↺</button>`}
+          </div>
+        </div>`).join('')}
+    </section>`).join('');
+}
+
+$('#planning-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const id = btn.closest('.slot').dataset.id;
+  try {
+    await api('/api/session', { id, action: btn.dataset.action });
+    toast({ done: 'Marqué comme signé', skip: 'Créneau ignoré', reset: 'Annulé' }[btn.dataset.action]);
+    loadPlanning();
+  } catch (err) { toast(err.message); }
+});
+
+$('#planning-range').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-days]');
+  if (!btn) return;
+  planningDays = Number(btn.dataset.days);
+  $$('#planning-range button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+  loadPlanning();
+});
+
+// ── Historique ────────────────────────────────────────────
+function describe(h) {
+  switch (h.type) {
+    case 'sign':
+      if (h.dryRun) return ['🧪', `Mode test avec ${h.code}`, h.title];
+      if (h.ok) return ['✅', h.already ? 'Déjà signé sur SoWeSoft' : `Signé avec ${h.code}`, h.title];
+      return ['❌', 'Signature échouée', h.reason];
+    case 'reminder': return ['🔔', h.offset < 0 ? `Rappel ${-h.offset} min avant` : h.offset === 0 ? 'Rappel au début' : `Relance +${h.offset} min`, h.title];
+    case 'done': return ['👍', 'Marqué signé à la main', h.title];
+    case 'skip': return ['🙈', 'Créneau ignoré', h.title];
+    case 'pause': return ['⏸️', 'Rappels en pause'];
+    case 'resume': return ['▶️', 'Rappels réactivés'];
+    case 'test': return [h.ok ? '🔌' : '⚠️', h.ok ? 'Connexion SoWeSoft OK' : 'Connexion SoWeSoft échouée', h.reason];
+    case 'settings': return ['⚙️', 'Réglages modifiés'];
+    default: return ['•', h.type];
+  }
+}
+
+async function loadHistory() {
+  const list = $('#history-list');
+  let data;
+  try { data = await api('/api/history'); } catch { return; }
+  if (!data.history.length) {
+    list.innerHTML = '<li class="empty" style="display:block">Rien pour l’instant. Ton premier rappel arrivera au prochain créneau.</li>';
+    return;
+  }
+  list.innerHTML = data.history.map((h) => {
+    const [icon, title, sub] = describe(h);
+    return `<li>
+      <span class="tl-icon" aria-hidden="true">${icon}</span>
+      <div><div class="tl-title">${esc(title)}</div><div class="tl-time">${esc(fmtWhen(h.at))}${sub ? ` · ${esc(sub)}` : ''}</div></div>
+      ${h.screenshot ? `<img class="thumb" style="width:48px" src="/api/screenshots/${encodeURIComponent(h.screenshot)}" data-shot="${esc(h.screenshot)}" alt="Capture">` : '<span></span>'}
+    </li>`;
+  }).join('');
+}
+
+// ── Réglages ──────────────────────────────────────────────
+let method = 'password';
+function setMethod(m) {
+  method = m;
+  $$('#method button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.method === m)));
+  $$('[data-for]').forEach((el) => (el.hidden = el.dataset.for !== m));
+}
+$('#method').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-method]');
+  if (b) setMethod(b.dataset.method);
+});
+
+let qrTimer;
+async function loadWhatsApp() {
+  clearTimeout(qrTimer);
+  let q;
+  try { q = await api('/api/qr'); } catch { return; }
+  const text = {
+    ready: '✅ Connecté. Émile t’écrit sur WhatsApp.',
+    qr: 'Scanne ce QR code pour relier ton WhatsApp :',
+    starting: 'Démarrage de WhatsApp… le QR code arrive.',
+    disconnected: 'Déconnecté, reconnexion en cours…',
+    off: 'WhatsApp n’est pas lancé.',
+  }[q.status] || '—';
+  $('#wa-text').textContent = text;
+  $('#wa-qr').hidden = !q.image;
+  $('#wa-steps').hidden = !q.image;
+  if (q.image) $('#wa-qr').src = q.image;
+  if (q.status !== 'ready' && !$('[data-view="settings"]').hidden) qrTimer = setTimeout(loadWhatsApp, 4000);
+}
+
+async function loadSettings() {
+  loadWhatsApp();
+  let s;
+  try { s = await api('/api/settings'); } catch { return; }
+  const f = $('#settings-form');
+  f.institution.value = s.auth.institution || '';
+  f.email.value = s.auth.email || '';
+  f.id.value = s.auth.id || '';
+  f.password.value = '';
+  f.pin.value = '';
+  f.password.placeholder = s.auth.hasPassword ? '•••••• (inchangé)' : 'Ton mot de passe SoWeSoft';
+  f.pin.placeholder = s.auth.hasPin ? '•••• (inchangé)' : '4 chiffres';
+  f.dryRun.checked = s.dryRun;
+  f.reminderOffsets.value = s.reminderOffsets.join(', ');
+  f.keywords.value = s.keywords.join(', ');
+  f.icsUrl.value = s.icsUrl || '';
+  setMethod(s.auth.method);
+}
+
+$('#settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    await api('/api/settings', {
+      dryRun: f.dryRun.checked,
+      reminderOffsets: f.reminderOffsets.value,
+      keywords: f.keywords.value,
+      icsUrl: f.icsUrl.value,
+      auth: { method, institution: f.institution.value, email: f.email.value, password: f.password.value, id: f.id.value, pin: f.pin.value },
+    });
+    toast('Réglages enregistrés');
+    $('#settings-result').hidden = true;
+    loadSettings();
+    loadStatus();
+  } catch (err) {
+    const el = $('#settings-result');
+    el.hidden = false;
+    el.className = 'result is-error';
+    el.textContent = err.message;
+  }
+});
+
+$('#test-btn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.classList.add('is-loading');
+  try {
+    const r = await api('/api/test', {});
+    renderResult($('#settings-result'), r, { okText: 'Connexion SoWeSoft OK', testText: '' });
+    if (r.ok) $('#settings-result p').textContent = 'Émile accède bien à ton espace étudiant.';
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+  btn.classList.remove('is-loading');
+  loadStatus();
+});
+
+// ── Démarrage ─────────────────────────────────────────────
+let statusTimer;
+function start() {
+  $('#login').hidden = true;
+  $('#shell').hidden = false;
+  route();
+  loadStatus();
+  clearInterval(statusTimer);
+  statusTimer = setInterval(() => { if (!document.hidden) loadStatus(); }, 15000);
+}
+
+(async () => {
+  const me = await api('/api/me').catch(() => ({ authed: false, passwordRequired: true }));
+  if (me.authed) start();
+  else showLogin();
+})();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

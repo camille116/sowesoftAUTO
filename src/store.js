@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from '
 import { join } from 'node:path';
 
 const KEEP_DAYS = 30;
+const HISTORY_SIZE = 200;
 
 /** Petit état persistant en JSON : pause, créneaux signés, rappels déjà envoyés. */
 export class Store {
@@ -11,6 +12,18 @@ export class Store {
     this.state = existsSync(this.file)
       ? JSON.parse(readFileSync(this.file, 'utf8'))
       : { paused: false, sessions: {} };
+    this.state.history ||= [];
+  }
+
+  /** Journal affiché dans l'appli (signatures, rappels, erreurs). */
+  log(type, data = {}) {
+    this.state.history.unshift({ at: new Date().toISOString(), type, ...data });
+    this.state.history.length = Math.min(this.state.history.length, HISTORY_SIZE);
+    this.save();
+  }
+
+  get history() {
+    return this.state.history;
   }
 
   save() {
