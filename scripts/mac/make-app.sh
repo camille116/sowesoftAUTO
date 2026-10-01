@@ -27,7 +27,13 @@ make_icns() {  # $1 = fichier .icns de sortie
 # L'app native a besoin d'Electron (≈ 100 Mo) : on l'installe ici si besoin,
 # pour que l'installeur ET le bouton « Mettre à jour » donnent toujours la vraie app.
 if [ ! -d "$ELECTRON_APP" ] && [ -f "$DESKTOP/package.json" ] && command -v npm >/dev/null 2>&1; then
+  echo "Téléchargement de l'app Mac (Electron, ≈ 100 Mo)…" >&2
   (cd "$DESKTOP" && npm install --no-audit --no-fund --loglevel=error) >&2 || true
+  # si un premier téléchargement a échoué, npm croit Electron installé : on relance son téléchargement
+  if [ ! -d "$ELECTRON_APP" ] && [ -f "$DESKTOP/node_modules/electron/install.js" ]; then
+    (cd "$DESKTOP/node_modules/electron" && node install.js) >&2 || true
+  fi
+  [ -d "$ELECTRON_APP" ] || echo "⚠️  Electron n'a pas pu être téléchargé : l'app s'ouvrira dans une fenêtre de navigateur." >&2
 fi
 
 rm -rf "$APP"

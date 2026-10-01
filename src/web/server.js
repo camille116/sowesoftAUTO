@@ -77,7 +77,7 @@ function sessionView(s, store, now) {
  * Appli web LinkeD : API JSON + interface (src/web/public).
  * Protégée par WEB_PASSWORD ; sans mot de passe, elle n'écoute que sur la machine locale.
  */
-export function createWebServer({ app, channels, updater, password, dataDir }) {
+export function createWebServer({ app, channels, updater, desktop, password, dataDir }) {
   const wa = () => channels?.whatsapp || null;
   const tg = () => channels?.telegram || null;
   const { bot, store, planning, signer, settings, members } = app;
@@ -268,6 +268,17 @@ export function createWebServer({ app, channels, updater, password, dataDir }) {
       else if (action === 'reset') store.update(session.id, { signedAt: null, signedBy: null, skipped: false });
       else return json(res, 400, { error: 'Action inconnue' });
       json(res, 200, { session: sessionView(session, store, new Date()) });
+    },
+
+    'GET /api/desktop': async (req, res) => json(res, 200, desktop ? desktop.status() : { mac: false }),
+
+    'POST /api/desktop/repair': async (req, res) => {
+      if (!desktop) return json(res, 400, { error: 'Indisponible' });
+      try {
+        json(res, 200, desktop.repair());
+      } catch (err) {
+        json(res, 400, { error: err.message });
+      }
     },
 
     'GET /api/version': async (req, res) => {

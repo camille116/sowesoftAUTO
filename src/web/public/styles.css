@@ -412,3 +412,7 @@ code { background: var(--surface-3); border: 1px solid var(--border); padding: .
 [data-shell="desktop"] .page-head .segmented { -webkit-app-region: no-drag; }
 [data-shell="desktop"] .login::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 40px; -webkit-app-region: drag; }
 [data-shell="desktop"] body::before { display: none; }
+
+.banner-info { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+.banner-info button { margin-left: 8px; }
+.log { margin: 0; max-height: 220px; overflow: auto; font: .75rem/1.45 var(--mono); color: var(--text-2); background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; white-space: pre-wrap; }

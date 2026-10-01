@@ -785,6 +785,50 @@ $('#template-reset').addEventListener('click', () => {
   $('#member-template').dispatchEvent(new Event('input'));
 });
 
+// ── App Mac (Electron) : diagnostic et réparation ─────────
+const inDesktopApp = () => document.documentElement.dataset.shell === 'desktop';
+let desktopTimer;
+
+async function loadDesktop() {
+  clearTimeout(desktopTimer);
+  let d;
+  try { d = await api('/api/desktop'); } catch { return; }
+  if (!d.mac) return;
+  $('#desktop-box').hidden = false;
+  const state = d.repairing ? '⏳ Installation en cours…'
+    : d.kind === 'native' ? '✅ App native installée'
+    : d.kind === 'launcher' ? '⚠️ Ouverture dans une fenêtre de navigateur'
+    : '⚠️ App absente du dossier Applications';
+  $('#desktop-state').textContent = state;
+  $('#desktop-text').textContent = d.repairing ? 'Téléchargement d’Electron (≈ 100 Mo) puis création de l’app, 1 à 5 min.'
+    : d.chromeShortcuts.length ? 'Un raccourci Chrome « LinkeD » existe : la réparation le supprime.'
+    : d.kind === 'native' ? (inDesktopApp() ? 'Tu utilises l’app native.' : 'Ferme cette fenêtre et ouvre LinkeD depuis le dossier Applications.')
+    : 'Clique pour télécharger et créer la vraie app (fenêtre, Dock, menus).';
+  $('#desktop-btn').disabled = d.repairing || !d.managed;
+  if (d.last && !d.repairing) {
+    $('#desktop-log').hidden = d.last.ok;
+    $('#desktop-log').textContent = d.last.output || `Code de sortie ${d.last.code}`;
+  }
+  const banner = $('#alert-browser');
+  banner.hidden = inDesktopApp() || !d.managed;
+  if (!banner.hidden) {
+    banner.innerHTML = d.kind === 'native'
+      ? '<b>Tu es dans une fenêtre de navigateur.</b> L’app LinkeD est installée : ferme cette fenêtre et ouvre <b>LinkeD</b> depuis le dossier Applications (ou le Launchpad).'
+      : '<b>Tu es dans une fenêtre de navigateur.</b> L’app Mac n’est pas encore installée. <button class="btn btn-primary btn-sm" type="button" data-desktop-repair>Installer l’app Mac</button>';
+  }
+  if (d.repairing) desktopTimer = setTimeout(loadDesktop, 3000);
+}
+
+async function repairDesktop() {
+  try {
+    await api('/api/desktop/repair', {});
+    toast('Installation de l’app Mac lancée');
+    setTimeout(loadDesktop, 800);
+  } catch (err) { toast(err.message); }
+}
+$('#desktop-btn').addEventListener('click', repairDesktop);
+document.addEventListener('click', (e) => { if (e.target.closest('[data-desktop-repair]')) repairDesktop(); });
+
 // ── Démarrage ─────────────────────────────────────────────
 let statusTimer;
 function start() {
@@ -793,6 +837,7 @@ function start() {
   route();
   loadStatus();
   loadVersion();
+  loadDesktop();
   clearInterval(statusTimer);
   statusTimer = setInterval(() => { if (!document.hidden) loadStatus(); }, 15000);
 }

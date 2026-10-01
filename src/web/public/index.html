@@ -77,6 +77,7 @@
         </header>
 
         <div id="alert-login" class="banner banner-danger" hidden></div>
+        <div id="alert-browser" class="banner banner-info" hidden></div>
 
         <div class="kpis">
           <div class="kpi"><p class="kpi-label">Aujourd'hui</p><p class="kpi-value" id="kpi-today">—</p><p class="kpi-sub" id="kpi-today-sub">créneaux à signer</p></div>
@@ -370,6 +371,15 @@
               </div>
               <button id="update-btn" class="btn btn-primary" type="button" disabled>Mettre à jour</button>
             </div>
+            <div class="update-box" id="desktop-box" hidden>
+              <div>
+                <p class="eyebrow">App Mac</p>
+                <p id="desktop-state">—</p>
+                <p id="desktop-text" class="small muted">—</p>
+              </div>
+              <button id="desktop-btn" class="btn btn-ghost" type="button">Installer / réparer l'app Mac</button>
+            </div>
+            <pre id="desktop-log" class="log" hidden></pre>
             <p class="small muted">Ne signe que lorsque tu es vraiment en cours : l'émargement atteste ta présence.</p>
           </article>
         </div>

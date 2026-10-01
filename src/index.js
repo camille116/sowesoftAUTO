@@ -4,6 +4,7 @@ import { createTelegram } from './telegram.js';
 import { createWhatsApp } from './whatsapp.js';
 import { createWebServer } from './web/server.js';
 import { createUpdater } from './updater.js';
+import { createDesktop } from './desktop.js';
 import { msg } from './messages.js';
 import { log } from './logger.js';
 
@@ -90,7 +91,8 @@ const updater = createUpdater({
   branch: process.env.UPDATE_BRANCH || 'claude/whatsapp-signature-bot-q8m9ha',
   managed: process.env.LINKED_MANAGED === '1',
 });
-createWebServer({ app, channels, updater, password, dataDir: config.dataDir }).listen(port, host, () => {
+const desktop = createDesktop({ root: config.root, dataDir: config.dataDir, managed: process.env.LINKED_MANAGED === '1' });
+createWebServer({ app, channels, updater, desktop, password, dataDir: config.dataDir }).listen(port, host, () => {
   log.info(`LinkeD : http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
 });
 

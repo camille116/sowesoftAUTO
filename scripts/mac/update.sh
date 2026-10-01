@@ -28,5 +28,5 @@ cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund --loglevel=error
 [ -d desktop ] && (cd desktop && npm install --no-audit --no-fund --loglevel=error) || echo "app Mac : installation ignorée"
 echo "$SHA" > VERSION
-bash scripts/mac/make-app.sh >/dev/null 2>&1 || true
+bash scripts/mac/make-app.sh 2>&1 || echo "make-app.sh a échoué"
 echo "[$(date '+%F %T')] OK"
