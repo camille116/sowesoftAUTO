@@ -49,3 +49,16 @@ test('fusion ICS + manuel sans doublon, et créneau courant', async () => {
   assert.ok(early, '5 min avant compte comme créneau en cours');
   assert.equal(await planning.current(new Date('2026-10-06T18:00:00+02:00')), null);
 });
+
+test('format Hyperplanning (OMNES) : détecte « Type : AUTONOMIE », ignore CRS et ELEARNING', () => {
+  const hp = parseIcs(readFileSync(new URL('./fixtures/hyperplanning.ics', import.meta.url), 'utf8'));
+  const keywords = ['autonomie', 'autonome', 'travail personnel', 'distanciel'];
+  const week = [new Date('2026-10-19T00:00:00+02:00'), new Date('2026-10-25T23:59:59+02:00')];
+  const sessions = autonomyFromCalendar(hp, keywords, ...week);
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0].start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), '17:30');
+  assert.match(sessions[0].title, /^Marketplaces/);
+
+  const withElearning = autonomyFromCalendar(hp, [...keywords, 'elearning'], ...week);
+  assert.equal(withElearning.length, 2);
+});
