@@ -37,7 +37,12 @@ echo "   tables créées"
 bold "🚀 Mise en ligne du relais…"
 DEPLOY_OUT="$($WRANGLER deploy $CFG 2>&1)"
 echo "$DEPLOY_OUT"
-printf '%s' "$DEPLOY_OUT" | grep -qiE 'success|deployed|uploaded' || die "La mise en ligne a échoué (voir ci-dessus)."
+if printf '%s' "$DEPLOY_OUT" | grep -qi 'workers.dev subdomain'; then
+  ONBOARD="$(printf '%s' "$DEPLOY_OUT" | grep -oiE 'https://dash\.cloudflare\.com/[^ ]+/workers/onboarding' | head -1)"
+  die "Étape à faire une seule fois : choisis ton sous-domaine workers.dev ici, puis relance la commande :
+     ${ONBOARD:-https://dash.cloudflare.com/ → Workers & Pages → choisir un sous-domaine}"
+fi
+printf '%s' "$DEPLOY_OUT" | grep -qiE 'success|deployed|uploaded|workers\.dev' || die "La mise en ligne a échoué (voir ci-dessus)."
 URL="$(printf '%s' "$DEPLOY_OUT" | grep -oiE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)"
 
 # 4. Clé secrète (le Worker existe maintenant : on peut la poser), partagée entre le Mac et le relais
