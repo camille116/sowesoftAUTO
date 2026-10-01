@@ -7,6 +7,8 @@
 // Le relais n'ÉMET que des messages (aucun long polling), donc il ne gêne pas le bot qui tourne sur le Mac.
 // Il ne signe jamais sur SoWeSoft : uniquement des rappels.
 import { computeReminders } from '../src/relay/engine.js';
+import { relayHandle, applyOverrides } from '../src/relay/handle.js';
+import { coursesFromLite, parseIcsLite } from '../src/planning/ics-lite.js';
 import { fetchIcsText } from '../src/relay/fetch-ics.js';
 
 const TAKEOVER_MS = 3 * 60e3; // au-delà, le Mac est considéré hors ligne
@@ -57,8 +59,9 @@ export async function runOnce(env, now = new Date(), deps = {}) {
   let icsText;
   try { icsText = await fetchIcs(snapshot.icsUrl); } catch { return { skipped: 'ics-error' }; }
 
+  const overrides = await kvGet(env, 'overrides', {});
   const sent = await kvGet(env, 'sent', {});
-  const { actions, sentUpdates } = computeReminders(snapshot, sent, icsText, now);
+  const { actions, sentUpdates } = computeReminders(applyOverrides(snapshot, overrides), sent, icsText, now);
   let ok = 0;
   for (const action of actions) {
     if (await send(snapshot.telegramToken, action.chatId, action.text)) ok++;
@@ -68,10 +71,50 @@ export async function runOnce(env, now = new Date(), deps = {}) {
   return { sent: ok, attempted: actions.length };
 }
 
+/** Traite un message entrant Telegram via le cloud (lecture de l'agenda en direct). */
+export async function handleWebhook(env, update, deps = {}) {
+  const fetchIcs = deps.fetchIcs || fetchIcsText;
+  const send = deps.send || sendTelegram;
+  const snapshot = await kvGet(env, 'snapshot');
+  if (!snapshot?.telegramToken) return;
+
+  const now = new Date();
+  const dayWindow = (base) => [new Date(base.getFullYear(), base.getMonth(), base.getDate()), new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1)];
+  let coursesToday = [], coursesTomorrow = [];
+  if (snapshot.icsUrl) {
+    try {
+      const parsed = parseIcsLite(await fetchIcs(snapshot.icsUrl));
+      const t = dayWindow(now); coursesToday = coursesFromLite(parsed, t[0], t[1]);
+      const tm = dayWindow(new Date(now.getTime() + 864e5)); coursesTomorrow = coursesFromLite(parsed, tm[0], tm[1]);
+    } catch { /* agenda indisponible : on répond quand même aux commandes simples */ }
+  }
+
+  const lastSeen = await kvGet(env, 'lastSeen', 0);
+  const macOnline = now.getTime() - new Date(lastSeen).getTime() < TAKEOVER_MS;
+  const overrides = await kvGet(env, 'overrides', {});
+  const result = relayHandle({ update, snapshot, overrides, coursesToday, coursesTomorrow, macOnline, now });
+
+  for (const r of result.replies) await send(snapshot.telegramToken, r.chatId, r.text);
+  await kvSet(env, 'overrides', result.overrides);
+  if (result.signCode) {
+    const queue = await kvGet(env, 'codeQueue', []);
+    queue.push({ ...result.signCode, at: now.toISOString() });
+    await kvSet(env, 'codeQueue', queue);
+  }
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === '/health') return json({ ok: true, hasSnapshot: Boolean(await kvGet(env, 'snapshot')) });
+
+    // Webhook Telegram : messages entrants (même Mac éteint). Vérifié par le secret d'en-tête.
+    if (request.method === 'POST' && url.pathname === '/tg') {
+      if (request.headers.get('x-telegram-bot-api-secret-token') !== env.RELAY_SECRET) return json({ error: 'non autorisé' }, 401);
+      ctx.waitUntil(handleWebhook(env, await request.json().catch(() => ({}))));
+      return json({ ok: true });
+    }
+
     if (!authed(request, env)) return json({ error: 'non autorisé' }, 401);
 
     if (request.method === 'POST' && url.pathname === '/push') {
@@ -82,7 +125,11 @@ export default {
       // le Mac indique où il en est : on fusionne pour ne jamais renvoyer ce qu'il a déjà envoyé
       const merged = { ...(await kvGet(env, 'sent', {})), ...(snapshot.reminded || {}) };
       await kvSet(env, 'sent', merged);
-      return json({ ok: true, sent: merged });
+      // le Mac récupère ce que le cloud a changé (fait/stop/liaisons) + les codes à signer, puis on vide la file
+      const overrides = await kvGet(env, 'overrides', {});
+      const codeQueue = await kvGet(env, 'codeQueue', []);
+      if (codeQueue.length) await kvSet(env, 'codeQueue', []);
+      return json({ ok: true, sent: merged, overrides, codeQueue });
     }
     if (url.pathname === '/state') return json({ sent: await kvGet(env, 'sent', {}), lastSeen: await kvGet(env, 'lastSeen', 0) });
     if (request.method === 'POST' && url.pathname === '/test-reminder') {
@@ -98,6 +145,18 @@ export default {
       return json({ ok: true, sent: ok, recipients: recipients.length });
     }
     if (request.method === 'POST' && url.pathname === '/clear-sent') { await kvSet(env, 'sent', {}); return json({ ok: true }); }
+
+    // Enregistre le webhook Telegram côté relais (appelé par le Mac quand le relais est activé)
+    if (request.method === 'POST' && url.pathname === '/setup') {
+      const snap = await kvGet(env, 'snapshot');
+      if (!snap?.telegramToken) return json({ error: 'pas de configuration' }, 409);
+      const hook = `${url.origin}/tg`;
+      const res = await fetch(`https://api.telegram.org/bot${snap.telegramToken}/setWebhook`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: hook, secret_token: env.RELAY_SECRET, allowed_updates: ['message'], drop_pending_updates: false }),
+      }).then((r) => r.json()).catch(() => ({}));
+      return json({ ok: Boolean(res.ok), webhook: hook, telegram: res.description || res.result });
+    }
     return json({ error: 'introuvable' }, 404);
   },
 

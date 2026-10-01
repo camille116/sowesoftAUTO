@@ -202,7 +202,8 @@ export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, mem
   }
 
   /** (Re)démarre avec ce token. Sans token : canal éteint. */
-  async function start(newToken) {
+  // sendOnly : le relais cloud reçoit les messages (webhook) ; le Mac ne fait qu'envoyer.
+  async function start(newToken, { sendOnly = false } = {}) {
     generation++;
     token = newToken || null;
     if (!token) return setState({ status: 'off', username: null, error: null });
@@ -210,12 +211,13 @@ export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, mem
     setState({ status: 'starting', error: null });
     try {
       const me = await call('getMe');
-      await call('deleteWebhook', {}).catch(() => {});
       await call('setMyCommands', { commands: COMMANDS.map(([command, description]) => ({ command, description })) }).catch(() => {});
       if (gen !== generation) return;
-      setState({ username: me.username, status: state.owner ? 'ready' : 'waiting_link' });
-      log.info(`Telegram : bot @${me.username} ${state.owner ? `relié à ${state.owner.name}` : 'en attente de liaison'}`);
+      setState({ username: me.username, status: state.owner ? 'ready' : 'waiting_link', sendOnly });
+      log.info(`Telegram : bot @${me.username} ${sendOnly ? '(cloud reçoit les messages)' : ''} ${state.owner ? `relié à ${state.owner.name}` : 'en attente de liaison'}`);
       if (state.owner) onReady?.();
+      if (sendOnly) return; // pas de long polling : le webhook du relais s'en charge
+      await call('deleteWebhook', {}).catch(() => {});
       loop(gen);
     } catch (err) {
       if (gen !== generation) return;

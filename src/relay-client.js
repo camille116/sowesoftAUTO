@@ -1,13 +1,13 @@
 import { log } from './logger.js';
 
-const PUSH_MS = 60e3;
+const PUSH_MS = 15e3; // toutes les 15 s : récupère vite les codes à signer mis en file par le cloud
 
 /**
  * Côté Mac : pousse régulièrement l'état (planning, réglages, membres) vers le relais cloud,
  * pour qu'il prenne le relais des rappels quand le Mac est éteint. Récupère aussi ce que le relais
  * a déjà envoyé, pour ne pas envoyer de doublon au retour du Mac.
  */
-export function createRelayClient({ settings, store, members, telegram, fetchImpl = fetch }) {
+export function createRelayClient({ settings, store, members, telegram, onCode = null, fetchImpl = fetch }) {
   let timer = null;
 
   const config = () => {
@@ -45,8 +45,8 @@ export function createRelayClient({ settings, store, members, telegram, fetchImp
       telegramToken: s.telegramToken || null,
       paused: store.paused,
       owner: owner ? { chatId: owner, done } : null,
-      members: (members?.all() || []).filter((m) => m.chatId).map((m) => ({
-        id: m.id, name: m.name, chatId: m.chatId, status: m.status,
+      members: (members?.all() || []).map((m) => ({
+        id: m.id, name: m.name, phone: m.phone, chatId: m.chatId, status: m.status, inviteCode: m.inviteCode,
         done: Object.fromEntries(Object.entries(m.sessions || {}).filter(([, st]) => st.done).map(([id]) => [id, true])),
       })),
       reminded: reminded(),
@@ -71,6 +71,27 @@ export function createRelayClient({ settings, store, members, telegram, fetchImp
     }
   }
 
+  /** Applique ce que le cloud a changé (commandes reçues Mac éteint). */
+  function applyOverrides(ov) {
+    if (!ov) return;
+    if (ov.paused != null && ov.paused !== store.paused) store.setPaused(ov.paused);
+    for (const [id] of Object.entries(ov.ownerDone || {})) if (!store.isDone(id)) store.markSigned(id, 'cloud');
+    for (const [mid, patch] of Object.entries(ov.members || {})) {
+      const m = members?.get?.(mid) || members?.all().find((x) => x.id === mid);
+      if (!m) continue;
+      if (patch.chatId && m.chatId !== patch.chatId) members.link(m, patch.chatId, patch.telegramName || m.name);
+      if (patch.status && patch.status !== m.status) members.setPaused(m, patch.status === 'paused');
+      for (const [sid] of Object.entries(patch.done || {})) if (!m.sessions?.[sid]?.done) members.markDone(m, sid);
+    }
+  }
+
+  /** Signe les codes mis en file par le cloud (envoyés par toi Mac allumé). */
+  async function processCodes(queue) {
+    for (const item of queue || []) {
+      try { await onCode?.(item.code); } catch (err) { log.warn(`Code ${item.code} : ${err.message}`); }
+    }
+  }
+
   async function push() {
     const { url, secret } = config();
     if (!url || !secret) return;
@@ -82,8 +103,10 @@ export function createRelayClient({ settings, store, members, telegram, fetchImp
         signal: AbortSignal.timeout(15e3),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { sent } = await res.json();
+      const { sent, overrides, codeQueue } = await res.json();
       mergeSent(sent);
+      applyOverrides(overrides);
+      await processCodes(codeQueue);
     } catch (err) {
       log.warn(`Relais cloud injoignable : ${err.message}`);
     }
@@ -117,10 +140,23 @@ export function createRelayClient({ settings, store, members, telegram, fetchImp
     return data;
   }
 
+  /** Demande au relais d'enregistrer le webhook Telegram (le cloud reçoit les messages). */
+  async function setupWebhook() {
+    const { url, secret } = config();
+    if (!url || !secret) return { ok: false };
+    await push(); // le relais a besoin du token avant d'enregistrer le webhook
+    const res = await fetchImpl(`${url}/setup`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(20e3) });
+    return res.json().catch(() => ({ ok: false }));
+  }
+
+  const isConfigured = () => { const { url, secret } = config(); return Boolean(url && secret); };
+
   return {
     snapshot,
     test,
     testReminder,
+    setupWebhook,
+    isConfigured,
     push,
     start() {
       clearInterval(timer);

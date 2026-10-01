@@ -57,13 +57,23 @@ const channels = {
   get whatsapp() { return whatsapp; },
 };
 
-// Le bot Telegram tourne dès qu'il a un token : il sert aussi aux rappels de la classe,
-// même si l'admin reçoit ses propres messages sur WhatsApp.
-let telegramToken = null;
+// Relais cloud : pousse l'état vers Cloudflare pour les rappels (et commandes) quand le Mac est éteint
+const relay = createRelayClient({
+  settings: app.settings, store: app.store, members: app.members, telegram,
+  onCode: (code) => app.bot.handle(code), // un code mis en file par le cloud → le Mac signe
+});
+app.relay = relay;
+
+// Le bot Telegram : en mode normal il écoute (long polling) ; si le relais est configuré,
+// c'est le cloud qui écoute (webhook) et le Mac ne fait qu'envoyer.
+let telegramKey = null;
 function applyChannel(s) {
-  if (s.telegramToken !== telegramToken) {
-    telegramToken = s.telegramToken;
-    telegram.start(s.telegramToken);
+  const sendOnly = relay.isConfigured();
+  const key = `${s.telegramToken}|${sendOnly}`;
+  if (key !== telegramKey) {
+    telegramKey = key;
+    telegram.start(s.telegramToken, { sendOnly });
+    if (sendOnly && s.telegramToken) relay.setupWebhook().then((r) => log.info(`Relais : webhook ${r.ok ? 'activé' : 'non activé'}`)).catch((e) => log.warn(`Webhook : ${e.message}`));
   }
   if (s.channel === 'whatsapp') ensureWhatsApp();
 }
@@ -71,6 +81,7 @@ function applyChannel(s) {
 app.channel.send = (...args) => channels.active.send(...args);
 app.onChannelSettings = applyChannel;
 applyChannel(app.settings.get());
+relay.start();
 
 // ── Rappels ─────────────────────────────────────────────────
 const loop = () => app.bot.tick().catch((e) => log.error('Erreur tick :', e));
@@ -96,11 +107,6 @@ const desktop = createDesktop({ root: config.root, dataDir: config.dataDir, mana
 createWebServer({ app, channels, updater, desktop, password, dataDir: config.dataDir }).listen(port, host, () => {
   log.info(`LinkeD : http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
 });
-
-// Relais cloud : pousse l'état vers Cloudflare pour les rappels quand le Mac est éteint
-const relay = createRelayClient({ settings: app.settings, store: app.store, members: app.members, telegram });
-relay.start();
-app.relay = relay;
 
 const s = app.settings.get();
 log.info(`Démarrage de LinkeD – messagerie : ${s.channel}, rappels à ${s.reminderOffsets.join(', ')} min, mode test : ${s.dryRun}`);
