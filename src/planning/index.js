@@ -17,6 +17,7 @@ export class Planning {
     this.fetcher = fetcher;
     this.calendar = null;
     this.fetchedAt = 0;
+    this.lastError = null; // affiché dans l'appli si l'agenda est illisible
   }
 
   async refresh(force = false) {
@@ -25,8 +26,11 @@ export class Planning {
     try {
       this.calendar = await this.fetcher(this.icsUrl);
       this.fetchedAt = Date.now();
+      this.lastError = null;
       log.info('Agenda ICS mis à jour');
     } catch (err) {
+      this.lastError = err.message;
+      this.fetchedAt = Date.now() - ICS_TTL_MS + 60e3; // nouvel essai dans 1 min
       // on garde l'ancienne version en cache plutôt que de tout perdre
       log.warn(`Impossible de récupérer l'agenda ICS : ${err.message}`);
     }

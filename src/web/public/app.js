@@ -72,8 +72,9 @@ $('#login-form').addEventListener('submit', async (e) => {
 
 // ── Accueil ───────────────────────────────────────────────
 const WA = {
-  ready: ['WhatsApp connecté', 'ok'], qr: ['WhatsApp à connecter', 'warn'], starting: ['WhatsApp démarre', 'warn'],
-  disconnected: ['WhatsApp déconnecté', 'danger'], off: ['WhatsApp coupé', ''],
+  ready: ['WhatsApp connecté', 'ok'], qr: ['WhatsApp à connecter', 'warn'], code: ['WhatsApp à connecter', 'warn'],
+  starting: ['WhatsApp démarre', 'warn'], syncing: ['WhatsApp se synchronise', 'warn'],
+  disconnected: ['WhatsApp déconnecté', 'danger'], error: ['Erreur WhatsApp', 'danger'], off: ['WhatsApp coupé', ''],
 };
 
 async function loadStatus() {
@@ -176,6 +177,10 @@ async function loadPlanning() {
   const list = $('#planning-list');
   let data;
   try { data = await api(`/api/planning?days=${planningDays}`); } catch { return; }
+  const alert = $('#ics-alert');
+  alert.hidden = data.ics.configured && !data.ics.error;
+  if (!data.ics.configured) alert.innerHTML = '<b>Aucun lien Hyperplanning.</b> Colle ton lien iCal dans <a href="#settings">Réglages</a> pour voir tes vrais créneaux.';
+  else if (data.ics.error) alert.innerHTML = `<b>Hyperplanning illisible</b> (${esc(data.ics.error)}). Vérifie le lien iCal dans <a href="#settings">Réglages</a>.`;
   if (!data.sessions.length) {
     list.innerHTML = '<div class="empty card"><b>🌿</b>Aucune autonomie sur la période.</div>';
     return;
@@ -195,12 +200,13 @@ async function loadPlanning() {
           <div>
             <div class="slot-title">${esc(s.title)}</div>
             <span class="status status-${s.status}">${STATUS[s.status]}${s.signedBy === 'bot' ? ' par Émile' : ''}</span>
+            <span class="slot-sub">${s.source === 'ics' ? 'Hyperplanning' : 'ajouté à la main'}</span>
           </div>
           <div class="slot-actions">
             ${s.status === 'pending' || s.status === 'missed'
-              ? `<button class="icon-btn" data-action="done" title="J'ai signé moi-même" aria-label="Marquer comme signé">✓</button>
-                 <button class="icon-btn" data-action="skip" title="Pas besoin de signer" aria-label="Ignorer">⤼</button>`
-              : `<button class="icon-btn" data-action="reset" title="Annuler" aria-label="Annuler">↺</button>`}
+              ? `<button class="chip-btn" data-action="done" title="J'ai signé moi-même">✓ Fait</button>
+                 <button class="chip-btn" data-action="skip" title="Pas besoin de signer ce créneau">Ignorer</button>`
+              : `<button class="chip-btn" data-action="reset" title="Revenir à « à signer »">Annuler</button>`}
           </div>
         </div>`).join('')}
     </section>`).join('');
@@ -239,6 +245,7 @@ function describe(h) {
     case 'resume': return ['▶️', 'Rappels réactivés'];
     case 'test': return [h.ok ? '🔌' : '⚠️', h.ok ? 'Connexion SoWeSoft OK' : 'Connexion SoWeSoft échouée', h.reason];
     case 'settings': return ['⚙️', 'Réglages modifiés'];
+    case 'notif-test': return ['📱', 'Notification de test envoyée'];
     default: return ['•', h.type];
   }
 }
@@ -279,18 +286,66 @@ async function loadWhatsApp() {
   let q;
   try { q = await api('/api/qr'); } catch { return; }
   const text = {
-    ready: '✅ Connecté. Émile t’écrit sur WhatsApp.',
+    ready: '✅ Connecté. Émile t’écrit dans ta discussion « Moi (Vous) » (ou au numéro du bot).',
     qr: 'Scanne ce QR code pour relier ton WhatsApp :',
-    starting: 'Démarrage de WhatsApp… le QR code arrive.',
-    disconnected: 'Déconnecté, reconnexion en cours…',
+    code: 'Connexion par code :',
+    starting: '⏳ Démarrage de WhatsApp… le QR code arrive (jusqu’à 1 min).',
+    syncing: `✅ C’est scanné ! Synchronisation de WhatsApp${q.percent ? ` : ${q.percent} %` : '…'} Ça peut prendre 1 à 3 min, garde ton téléphone allumé avec internet.`,
+    disconnected: `⚠️ ${q.error || 'Déconnecté'}. Reconnexion automatique en cours…`,
+    error: `❌ ${q.error || 'Erreur WhatsApp'}`,
     off: 'WhatsApp n’est pas lancé.',
   }[q.status] || '—';
   $('#wa-text').textContent = text;
+
   $('#wa-qr').hidden = !q.image;
   $('#wa-steps').hidden = !q.image;
   if (q.image) $('#wa-qr').src = q.image;
-  if (q.status !== 'ready' && !$('[data-view="settings"]').hidden) qrTimer = setTimeout(loadWhatsApp, 4000);
+
+  const progress = $('#wa-progress');
+  progress.hidden = q.status !== 'syncing';
+  progress.firstElementChild.style.width = `${q.percent || 8}%`;
+
+  $('#wa-code-box').hidden = q.status !== 'code';
+  if (q.status === 'code') $('#wa-code').textContent = q.code ? q.code.replace(/^(.{4})(.{4})$/, '$1-$2') : 'Génération…';
+  $('#wa-pair-form').hidden = q.status !== 'qr';
+  $('#wa-test').hidden = q.status !== 'ready';
+  $('#wa-reset').hidden = !['ready', 'error', 'disconnected', 'syncing', 'code'].includes(q.status);
+  $('#wa-reset').textContent = q.status === 'ready' ? 'Déconnecter / changer de compte' : 'Réinitialiser WhatsApp';
+
+  if (q.status !== 'ready' && !$('[data-view="settings"]').hidden) qrTimer = setTimeout(loadWhatsApp, 3000);
 }
+
+$('#wa-pair-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  try {
+    const { code } = await api('/api/whatsapp/pair', { phone: $('#wa-phone').value });
+    toast(`Code : ${code}`);
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+  loadWhatsApp();
+});
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-notif-test]');
+  if (!btn) return;
+  btn.disabled = true;
+  try {
+    await api('/api/whatsapp/test', {});
+    toast('Notif envoyée ! Regarde WhatsApp 📱');
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+});
+
+$('#wa-reset').addEventListener('click', async () => {
+  if (!confirm('Oublier la connexion WhatsApp actuelle et afficher un nouveau QR code ?')) return;
+  try {
+    await api('/api/whatsapp/reset', {});
+    toast('WhatsApp réinitialisé, un nouveau QR arrive');
+  } catch (err) { toast(err.message); }
+  setTimeout(loadWhatsApp, 1500);
+});
 
 async function loadSettings() {
   loadWhatsApp();

@@ -5,6 +5,7 @@ import { join, extname } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import QRCode from 'qrcode';
 import { log } from '../logger.js';
+import { msg } from '../messages.js';
 
 const PUBLIC = join(import.meta.dirname, 'public');
 const TYPES = {
@@ -96,8 +97,40 @@ export function createWebServer({ app, whatsapp, password, dataDir }) {
     },
 
     'GET /api/qr': async (req, res) => {
-      const qr = whatsapp?.state.status === 'qr' ? whatsapp.state.qr : null;
-      json(res, 200, { status: whatsapp ? whatsapp.state.status : 'off', image: qr ? await QRCode.toDataURL(qr, { margin: 1, width: 280 }) : null });
+      if (!whatsapp) return json(res, 200, { status: 'off' });
+      const { status, qr, code, percent, error } = whatsapp.state;
+      json(res, 200, {
+        status, code, percent, error,
+        image: status === 'qr' && qr ? await QRCode.toDataURL(qr, { margin: 1, width: 280 }) : null,
+      });
+    },
+
+    'POST /api/whatsapp/pair': async (req, res) => {
+      if (!whatsapp?.pair) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
+      try {
+        const { phone } = await readBody(req);
+        json(res, 200, { code: await whatsapp.pair(phone) });
+      } catch (err) {
+        json(res, 400, { error: err.message || String(err) });
+      }
+    },
+
+    'POST /api/whatsapp/test': async (req, res) => {
+      if (!whatsapp) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
+      if (whatsapp.state.status !== 'ready') return json(res, 409, { error: 'WhatsApp n’est pas encore connecté (onglet Réglages)' });
+      try {
+        await whatsapp.send(msg.testNotification());
+        store.log('notif-test');
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 500, { error: `Envoi impossible : ${err.message || err}` });
+      }
+    },
+
+    'POST /api/whatsapp/reset': async (req, res) => {
+      if (!whatsapp?.reset) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
+      whatsapp.reset().catch((e) => log.error('Reset WhatsApp :', e));
+      json(res, 200, { ok: true });
     },
 
     'GET /api/planning': async (req, res, url) => {
@@ -105,7 +138,10 @@ export function createWebServer({ app, whatsapp, password, dataDir }) {
       const days = Math.min(Number(url.searchParams.get('days') || 7), 31);
       const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const sessions = await planning.between(from, new Date(from.getTime() + days * 24 * 3600e3));
-      json(res, 200, { sessions: sessions.map((s) => sessionView(s, store, now)) });
+      json(res, 200, {
+        sessions: sessions.map((s) => sessionView(s, store, now)),
+        ics: { configured: Boolean(planning.icsUrl), error: planning.lastError, loaded: Boolean(planning.calendar) },
+      });
     },
 
     'GET /api/history': async (req, res) => json(res, 200, { history: store.history.slice(0, 100) }),

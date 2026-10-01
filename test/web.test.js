@@ -26,7 +26,14 @@ const config = {
 const signer = { busy: false, dryRun: true, auth: {}, loginLocked: null, calls: [], async sign(code) { this.calls.push(code); return { ok: true }; }, async check() { return { ok: true }; } };
 const sent = [];
 const app = createApp(config, { signer, send: async (t) => sent.push(t) });
-const whatsapp = { state: { status: 'qr', qr: 'hello' } };
+const whatsapp = {
+  state: { status: 'qr', qr: 'hello' },
+  resets: 0,
+  sent: [],
+  async send(text) { this.sent.push(text); },
+  async pair(phone) { if (!phone) throw new Error('Numéro invalide'); this.state.status = 'code'; this.state.code = 'ABCD1234'; return 'ABCD1234'; },
+  async reset() { this.resets++; this.state.status = 'qr'; },
+};
 let server, base, cookie = '';
 
 const call = async (path, body) => {
@@ -116,4 +123,23 @@ test('pause des rappels', async () => {
 test('captures : nom de fichier contrôlé', async () => {
   assert.equal((await call('/api/screenshots/..%2F..%2Fsettings.json')).status, 404);
   assert.equal((await call('/api/screenshots/absente.png')).status, 404);
+});
+
+test('WhatsApp : connexion par code et réinitialisation', async () => {
+  assert.equal((await call('/api/whatsapp/pair', { phone: '' })).status, 400);
+  assert.equal((await call('/api/whatsapp/pair', { phone: '0612345678' })).body.code, 'ABCD1234');
+  const q = await call('/api/qr');
+  assert.equal(q.body.status, 'code');
+  assert.equal(q.body.code, 'ABCD1234');
+  assert.equal(q.body.image, null, 'pas de QR pendant l’appairage par code');
+  assert.equal((await call('/api/whatsapp/reset', {})).status, 200);
+  assert.equal(whatsapp.resets, 1);
+});
+
+test('WhatsApp : notification de test (seulement une fois connecté)', async () => {
+  whatsapp.state.status = 'qr';
+  assert.equal((await call('/api/whatsapp/test', {})).status, 409);
+  whatsapp.state.status = 'ready';
+  assert.equal((await call('/api/whatsapp/test', {})).status, 200);
+  assert.match(whatsapp.sent.at(-1), /Notification de test/);
 });

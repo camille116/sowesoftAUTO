@@ -78,6 +78,7 @@
               <span id="reminders-label">Actifs</span>
             </label>
             <p class="muted small">Coupe-les pendant les vacances.</p>
+            <button class="btn btn-ghost btn-sm" type="button" data-notif-test>🔔 Envoyer une notif de test</button>
           </article>
         </div>
       </section>
@@ -92,6 +93,7 @@
           </div>
         </div>
         <p class="muted small">Tes heures d'autonomie et d'e-learning, lues dans Hyperplanning.</p>
+        <div id="ics-alert" class="banner banner-danger" hidden></div>
         <div id="planning-list" class="day-list"></div>
       </section>
 
@@ -105,15 +107,39 @@
       <section class="view" data-view="settings" hidden>
         <div class="view-head"><h2>Réglages</h2></div>
 
-        <article class="card" id="whatsapp-card">
+        <article class="card stack" id="whatsapp-card">
           <h3>WhatsApp</h3>
-          <p id="wa-text" class="muted">—</p>
+          <p id="wa-text">—</p>
+          <div id="wa-progress" class="progress progress-ink" hidden><span></span></div>
           <img id="wa-qr" alt="QR code à scanner avec WhatsApp" hidden width="240" height="240">
           <ol id="wa-steps" class="steps small" hidden>
             <li>Ouvre WhatsApp sur ton téléphone</li>
             <li>Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
-            <li>Scanne ce QR code</li>
+            <li>Scanne ce QR code, puis <b>laisse ton téléphone allumé</b> 1 à 3 min pendant la synchronisation</li>
           </ol>
+
+          <div id="wa-code-box" class="pair-code" hidden>
+            <p class="eyebrow">Ton code de connexion</p>
+            <p id="wa-code" class="pair-code-value">— — — —</p>
+            <ol class="steps small">
+              <li>WhatsApp → Réglages → <b>Appareils connectés</b> → <b>Connecter un appareil</b></li>
+              <li>En bas : <b>« Se connecter avec un numéro de téléphone »</b></li>
+              <li>Tape ce code (une notification WhatsApp peut aussi s'afficher)</li>
+            </ol>
+          </div>
+
+          <form id="wa-pair-form" class="pair-form" hidden>
+            <p class="small muted">Le QR ne passe pas ? Connecte-toi avec un code à la place :</p>
+            <div class="row">
+              <input id="wa-phone" class="input" inputmode="tel" placeholder="Ton numéro (06…)" aria-label="Numéro WhatsApp à connecter">
+              <button class="btn btn-ghost" type="submit">Obtenir un code</button>
+            </div>
+          </form>
+
+          <div class="row">
+            <button id="wa-test" class="btn btn-primary" type="button" data-notif-test hidden>🔔 Envoyer une notif de test</button>
+            <button id="wa-reset" class="btn btn-ghost" type="button" hidden>Réinitialiser WhatsApp</button>
+          </div>
         </article>
 
         <form id="settings-form" class="card stack">

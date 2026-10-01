@@ -81,5 +81,7 @@ export const msg = {
   testing: () => `${BOT_TAG} 🔌 Je teste la connexion à Sowesoft…`,
   testOk: () => `${BOT_TAG} ✅ Connexion à Sowesoft OK (capture ci-jointe).`,
   testFailed: (reason) => `${BOT_TAG} ❌ Connexion à Sowesoft impossible : ${reason}`,
+  testNotification: () =>
+    `${BOT_TAG} 🔔 *Notification de test*\nSi tu lis ce message, les rappels de signature arriveront bien ici. 👌\n\nRéponds *aide* pour voir ce que je sais faire.`,
   unknown: () => `${BOT_TAG} Je n'ai pas compris 🤔 Envoie un *code* (ex : 48213) ou tape *aide*.`,
 };

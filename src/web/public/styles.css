@@ -256,3 +256,25 @@ main { display: block; }
 .lightbox-close { background: rgb(255 255 255 / 90%); color: #14213d; width: 40px; padding: 0; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+/* ── WhatsApp : appairage ────────────────── */
+.progress-ink { background: var(--line); margin-top: 0; }
+.progress-ink span { background: var(--ok); }
+.pair-code { background: var(--surface-2); border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 14px; }
+.pair-code-value { font: 700 2rem/1.2 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .12em; color: var(--ink); margin: 4px 0 8px; }
+.pair-form .row { flex-wrap: nowrap; }
+.input {
+  flex: 1; min-width: 0; font: 400 1rem var(--font); color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px; min-height: 44px;
+}
+.input:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px rgb(61 107 216 / 18%); }
+
+.chip-btn {
+  appearance: none; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font: 600 .85rem var(--font); padding: 0 12px; min-height: 36px; border-radius: 99px; cursor: pointer; white-space: nowrap;
+}
+.chip-btn:hover { background: var(--surface); border-color: var(--ink-2); }
+.slot-sub { display: block; margin-top: 2px; }
+@media (max-width: 420px) { .slot { grid-template-columns: auto 1fr; } .slot-actions { grid-column: 1 / -1; justify-content: flex-end; } }
+
+.btn-sm { min-height: 38px; padding: 8px 14px; font-size: .9rem; margin-top: 10px; }

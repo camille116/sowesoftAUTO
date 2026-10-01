@@ -84,7 +84,7 @@ Dès que le bot tourne, ouvre **http://localhost:3000** sur la machine du bot. D
 **Option A – agenda de l'école (recommandé).** La plupart des outils d'emploi du temps (Hyperplanning, Ypareo, Aurion, Google Agenda, Outlook…) proposent un lien d'export **ICS / iCal**. Colle-le dans `ICS_URL`.
 Les créneaux sont retenus si leur titre, description ou lieu contient un des `AUTONOMY_KEYWORDS` (`autonomie,autonome,travail personnel,elearning…`).
 
-**Option B – planning manuel.** Édite `config/planning.json` :
+**Option B – planning manuel.** Édite `config/planning.json` (vide par défaut ; exemple dans `config/planning.example.json`) :
 
 ```json
 {

@@ -49,7 +49,13 @@ const app = createApp(demoConfig, { signer: fakeSigner });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: -5 });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: 0 });
 
-const whatsapp = { state: { status: process.env.DEMO_WA || 'ready', qr: 'demo-qr-code-emile' } };
+// faux WhatsApp : DEMO_WA=qr|code|syncing|ready|error pour voir chaque écran
+const whatsapp = {
+  state: { status: process.env.DEMO_WA || 'ready', qr: 'demo-qr-code-emile', code: 'K7QX2M9D', percent: 42, error: 'Échec d’authentification (démo)' },
+  async pair() { Object.assign(this.state, { status: 'code', code: 'K7QX2M9D' }); return 'K7QX2M9D'; },
+  async reset() { Object.assign(this.state, { status: 'qr' }); },
+  async send(text) { console.log('[démo WhatsApp]', text); },
+};
 const port = Number(process.env.WEB_PORT || 3000);
 createWebServer({ app, whatsapp, password: 'demo', dataDir: demoConfig.dataDir }).listen(port, '127.0.0.1', () => {
   console.log(`Démo Émile : http://localhost:${port}  (mot de passe : demo · code 00000 = échec simulé)`);
