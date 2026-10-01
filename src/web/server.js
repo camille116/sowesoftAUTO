@@ -35,7 +35,9 @@ function sessionView(s, store, now) {
  * Appli web d'Émile : API JSON + interface (src/web/public).
  * Protégée par WEB_PASSWORD ; sans mot de passe, elle n'écoute que sur la machine locale.
  */
-export function createWebServer({ app, whatsapp, password, dataDir }) {
+export function createWebServer({ app, channels, password, dataDir }) {
+  const wa = () => channels?.whatsapp || null;
+  const tg = () => channels?.telegram || null;
   const { bot, store, planning, signer, settings } = app;
   const tokens = new Set();
 
@@ -84,7 +86,7 @@ export function createWebServer({ app, whatsapp, password, dataDir }) {
       const next = upcoming.find((s) => s.start > now);
       const s = settings.get();
       json(res, 200, {
-        whatsapp: whatsapp ? whatsapp.state.status : 'off',
+        messaging: { channel: s.channel, status: channels?.active?.state.status || 'off' },
         paused: store.paused,
         dryRun: s.dryRun,
         loginMethod: s.auth.method,
@@ -97,8 +99,8 @@ export function createWebServer({ app, whatsapp, password, dataDir }) {
     },
 
     'GET /api/qr': async (req, res) => {
-      if (!whatsapp) return json(res, 200, { status: 'off' });
-      const { status, qr, code, percent, error } = whatsapp.state;
+      if (!wa()) return json(res, 200, { status: 'off' });
+      const { status, qr, code, percent, error } = wa().state;
       json(res, 200, {
         status, code, percent, error,
         image: status === 'qr' && qr ? await QRCode.toDataURL(qr, { margin: 1, width: 280 }) : null,
@@ -106,30 +108,47 @@ export function createWebServer({ app, whatsapp, password, dataDir }) {
     },
 
     'POST /api/whatsapp/pair': async (req, res) => {
-      if (!whatsapp?.pair) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
+      if (!wa()?.pair) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
       try {
         const { phone } = await readBody(req);
-        json(res, 200, { code: await whatsapp.pair(phone) });
+        json(res, 200, { code: await wa().pair(phone) });
       } catch (err) {
         json(res, 400, { error: err.message || String(err) });
       }
     },
 
-    'POST /api/whatsapp/test': async (req, res) => {
-      if (!whatsapp) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
-      if (whatsapp.state.status !== 'ready') return json(res, 409, { error: 'WhatsApp n’est pas encore connecté (onglet Réglages)' });
+    'GET /api/telegram': async (req, res) => {
+      const t = tg();
+      if (!t) return json(res, 200, { status: 'off' });
+      const link = t.linkUrl();
+      json(res, 200, {
+        status: t.state.status, username: t.state.username, error: t.state.error,
+        owner: t.state.owner?.name || null, link, linkCode: t.state.linkCode,
+        qr: link && t.state.status === 'waiting_link' ? await QRCode.toDataURL(link, { margin: 1, width: 220 }) : null,
+      });
+    },
+
+    'POST /api/telegram/unlink': async (req, res) => {
+      tg()?.unlink();
+      json(res, 200, { ok: true });
+    },
+
+    'POST /api/notify-test': async (req, res) => {
+      const ch = channels?.active;
+      const name = settings.get().channel === 'whatsapp' ? 'WhatsApp' : 'Telegram';
+      if (!ch || ch.state.status !== 'ready') return json(res, 409, { error: `${name} n’est pas encore relié (onglet Réglages)` });
       try {
-        await whatsapp.send(msg.testNotification());
-        store.log('notif-test');
-        json(res, 200, { ok: true });
+        await ch.send(msg.testNotification());
+        store.log('notif-test', { channel: name });
+        json(res, 200, { ok: true, channel: name });
       } catch (err) {
         json(res, 500, { error: `Envoi impossible : ${err.message || err}` });
       }
     },
 
     'POST /api/whatsapp/reset': async (req, res) => {
-      if (!whatsapp?.reset) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
-      whatsapp.reset().catch((e) => log.error('Reset WhatsApp :', e));
+      if (!wa()?.reset) return json(res, 400, { error: 'WhatsApp n’est pas lancé' });
+      wa().reset().catch((e) => log.error('Reset WhatsApp :', e));
       json(res, 200, { ok: true });
     },
 

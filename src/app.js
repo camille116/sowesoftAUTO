@@ -18,6 +18,8 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     reminderOffsets: config.reminders.offsets,
     dryRun: config.sowesign.dryRun,
     auth: config.sowesign.auth,
+    channel: config.channel || 'telegram',
+    telegramToken: config.telegram?.token || '',
   });
   const s = settings.get();
 
@@ -50,8 +52,10 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     signer.auth = v.auth;
     signer.loginLocked = null; // nouveaux identifiants : on autorise un nouvel essai
     store.log('settings');
+    if (v.channel !== before.channel || v.telegramToken !== before.telegramToken) app.onChannelSettings?.(v);
     return settings.public();
   }
 
-  return { store, settings, planning, signer, bot, channel, updateSettings };
+  const app = { store, settings, planning, signer, bot, channel, updateSettings, onChannelSettings: null };
+  return app;
 }

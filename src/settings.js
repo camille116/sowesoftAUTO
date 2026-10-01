@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 const SECRET_FIELDS = ['password', 'pin'];
 const METHODS = ['password', 'code', 'sso'];
+const CHANNELS = ['telegram', 'whatsapp'];
 
 /**
  * Réglages modifiables depuis l'appli web.
@@ -27,7 +28,8 @@ export class Settings {
 
   /** Version sans secrets, pour l'affichage. */
   public() {
-    const { auth, ...rest } = this.values;
+    const { auth, telegramToken, ...rest } = this.values;
+    rest.hasTelegramToken = Boolean(telegramToken);
     const safeAuth = { ...auth };
     for (const f of SECRET_FIELDS) {
       safeAuth[`has${f[0].toUpperCase()}${f.slice(1)}`] = Boolean(auth[f]);
@@ -49,6 +51,15 @@ export class Settings {
       next.reminderOffsets = [...new Set(offsets)].sort((a, b) => a - b);
     }
     if ('dryRun' in patch) next.dryRun = Boolean(patch.dryRun);
+    if ('channel' in patch) {
+      if (!CHANNELS.includes(patch.channel)) throw new Error('Messagerie inconnue');
+      next.channel = patch.channel;
+    }
+    if (patch.telegramToken) {
+      const t = String(patch.telegramToken).trim();
+      if (!/^\d{5,}:[\w-]{30,}$/.test(t)) throw new Error('Token Telegram invalide : il ressemble à 123456789:AAH…, copie-le en entier depuis @BotFather');
+      next.telegramToken = t;
+    }
 
     if (patch.auth) {
       const a = patch.auth;

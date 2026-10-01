@@ -46,7 +46,9 @@ const call = async (path, body) => {
 };
 
 before(async () => {
-  server = createWebServer({ app, whatsapp, password: 'mdp-appli', dataDir });
+  const channels = { whatsapp, telegram: null, get active() { return whatsapp; } };
+  app.settings.update({ channel: 'whatsapp' });
+  server = createWebServer({ app, channels, password: 'mdp-appli', dataDir });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -64,7 +66,7 @@ test('connexion puis statut avec le créneau en cours', async () => {
   assert.equal(login.status, 200);
   cookie = login.headers.get('set-cookie').split(';')[0];
   const { body } = await call('/api/status');
-  assert.equal(body.whatsapp, 'qr');
+  assert.deepEqual(body.messaging, { channel: 'whatsapp', status: 'qr' });
   assert.equal(body.current.title, 'Autonomie test');
   assert.equal(body.current.status, 'pending');
 });
@@ -97,6 +99,8 @@ test('planning et actions sur un créneau', async () => {
 test('réglages : appliqués à chaud, secrets jamais renvoyés, mot de passe vide = inchangé', async () => {
   const before = await call('/api/settings');
   assert.equal(before.body.auth.hasPassword, true);
+  assert.equal(before.body.hasTelegramToken, false);
+  assert.equal((await call('/api/settings', { telegramToken: 'pas-un-token' })).status, 400);
   assert.equal(JSON.stringify(before.body).includes('secret-initial'), false);
 
   const saved = await call('/api/settings', { dryRun: false, reminderOffsets: '-10, 0, 20', keywords: 'autonomie, elearning', auth: { method: 'password', email: 'c@d.fr', password: '' } });
@@ -138,8 +142,8 @@ test('WhatsApp : connexion par code et réinitialisation', async () => {
 
 test('WhatsApp : notification de test (seulement une fois connecté)', async () => {
   whatsapp.state.status = 'qr';
-  assert.equal((await call('/api/whatsapp/test', {})).status, 409);
+  assert.equal((await call('/api/notify-test', {})).status, 409);
   whatsapp.state.status = 'ready';
-  assert.equal((await call('/api/whatsapp/test', {})).status, 200);
+  assert.equal((await call('/api/notify-test', {})).status, 200);
   assert.match(whatsapp.sent.at(-1), /Notification de test/);
 });

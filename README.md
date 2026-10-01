@@ -1,6 +1,6 @@
-# ✍️ Émile – ton assistant d'émargement WhatsApp
+# ✍️ Émile – ton assistant d'émargement (Telegram ou WhatsApp)
 
-Émile est un bot WhatsApp qui :
+Émile est un bot **Telegram** (ou WhatsApp) qui :
 
 1. **lit ton planning** (agenda ICS de l'école et/ou planning manuel) et repère tes **heures d'autonomie** ;
 2. **t'envoie un message quand tu dois signer** sur Sowesoft / SoWeSign, et te relance tant que ce n'est pas fait ;
@@ -11,13 +11,14 @@ Le tout se pilote depuis **l'appli Émile** : une interface web installable sur 
 > Le dossier de cadrage du projet (persona, parcours, ton de marque, architecture, roadmap) est dans [`docs/CADRAGE.md`](docs/CADRAGE.md).
 
 ```
- Agenda ICS ─┐                       ┌──────────────┐
-             ├─► Planning ─► Rappels ─►│  WhatsApp    │◄── toi : « 48213 »
- planning.json┘                       └──────┬───────┘
-                                             ▼
-                                  Robot navigateur (Chromium)
-                                             ▼
-                                   Sowesoft / SoWeSign ✅
+ Agenda ICS ───┐                         ┌──────────────┐
+               ├─► Planning ─► Rappels ─►│  Telegram /  │◄── toi : « 48213 »
+ planning.json ┘                         │  WhatsApp    │
+                                         └──────┬───────┘
+                                                ▼
+                                   Robot navigateur (Chromium)
+                                                ▼
+                                     SoWeSoft (app.sowesign.com) ✅
 ```
 
 ---
@@ -33,20 +34,20 @@ git clone https://github.com/camille116/sowesoftAUTO.git
 cd sowesoftAUTO
 cp .env.example .env        # puis remplis le fichier (voir ci-dessous)
 npm install
-npm start                   # un QR code s'affiche (aussi dans l'appli → Réglages)
+npm start                   # puis ouvre http://localhost:3000
 ```
 
-Scanne le QR code depuis WhatsApp → **Appareils connectés → Connecter un appareil**. La session est mémorisée dans `data/`, tu ne le fais qu'une fois.
+Dans l'appli → **Réglages → Messagerie**, crée et relie ton bot Telegram (ou scanne le QR WhatsApp). Les sessions sont mémorisées dans `data/` : tu ne le fais qu'une fois.
 
 ### Avec Docker
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
-docker compose logs -f      # pour scanner le QR code la 1re fois
+docker compose logs -f      # journal ; la configuration se fait dans l'appli
 ```
 
-### Quel numéro pour le bot ?
+### WhatsApp : quel numéro pour le bot ?
 
 | Option | Comment | Où tu parles au bot |
 |---|---|---|
@@ -54,6 +55,19 @@ docker compose logs -f      # pour scanner le QR code la 1re fois
 | **Un 2e numéro** (plus propre) | SIM/eSIM dédiée ou WhatsApp Business | Une discussion normale avec « Émile » |
 
 Dans les deux cas, renseigne **ton** numéro dans `OWNER_NUMBER` : le bot ignore tous les autres.
+
+---
+
+## 💬 Messagerie : Telegram (recommandé) ou WhatsApp
+
+| | Telegram | WhatsApp |
+|---|---|---|
+| Type | **Bot officiel** avec son propre contact « Émile » | Ton WhatsApp relié comme un « appareil connecté » (non officiel) |
+| Mise en place | Créer le bot avec @BotFather (2 min), coller le token, « Relier Telegram » | Scanner un QR code |
+| Fiabilité | ✅ API stable | ⚠️ Peut casser quand WhatsApp change son site |
+| Ressources | Très léger | Lance un Chromium en plus |
+
+Tout se règle dans l'appli : **Réglages → Messagerie**. Le bot Telegram ne répond qu'au compte relié avec le code de l'appli : les autres reçoivent « Ce bot est privé ». Il n'a pas besoin d'adresse publique (il va chercher les messages lui-même).
 
 ---
 
@@ -66,7 +80,7 @@ Dès que le bot tourne, ouvre **http://localhost:3000** sur la machine du bot. D
 | **Accueil** | Voir le créneau en cours (rouge = à signer, vert = signé), **taper le code et signer** en un bouton, couper/relancer les rappels |
 | **Planning** | Tes autonomies et e-learnings sur 7 jours ou un mois, avec leur statut ; marquer « signé moi-même » ou « ignorer » |
 | **Historique** | Rappels envoyés, signatures (avec la capture SoWeSoft en grand), erreurs |
-| **Réglages** | **QR code WhatsApp** à scanner, identifiants SoWeSoft, mode test, horaires des rappels, mots-clés, lien iCal, bouton « Tester la connexion » |
+| **Réglages** | **Messagerie** (création et liaison du bot Telegram, ou QR WhatsApp), notif de test, identifiants SoWeSoft, mode test, horaires des rappels, mots-clés, lien iCal, bouton « Tester la connexion » |
 
 - **Mot de passe** : définis `WEB_PASSWORD` dans `.env` pour ouvrir l'appli aux autres appareils de ton réseau. Sans mot de passe, elle n'est accessible que depuis la machine du bot.
 - **Installer sur le téléphone** : ouvre l'appli dans Safari ou Chrome, puis « Ajouter à l'écran d'accueil ».
@@ -163,7 +177,7 @@ toi : 48213
 ## 🧪 Développement
 
 ```bash
-npm test     # 34 tests : commandes, planning, rappels, bot, API de l'appli, et parcours SoWeSoft complet dans Chromium
+npm test     # 45 tests : commandes, planning, rappels, bot, API de l'appli, et parcours SoWeSoft complet dans Chromium
 ```
 
 Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui reproduit la structure de la vraie (`test/fixtures/mock-sowesign.js`). Définis `CHROME_PATH` si Chromium n'est pas trouvé ; sinon ce test est ignoré.
@@ -171,9 +185,10 @@ Le test de signature lance un vrai Chromium contre une fausse appli SoWeSoft qui
 ```
 src/
 ├── index.js            point d'entrée
-├── bot.js              logique du bot (indépendante de WhatsApp)
+├── bot.js              logique du bot (indépendante de la messagerie)
 ├── app.js              assemblage + réglages appliqués à chaud
 ├── settings.js         réglages modifiables depuis l'appli
+├── telegram.js         canal Telegram (API officielle, long polling)
 ├── whatsapp.js         canal WhatsApp (whatsapp-web.js)
 ├── web/                appli : serveur + API (server.js), interface (public/), démo
 ├── commands.js         compréhension des messages

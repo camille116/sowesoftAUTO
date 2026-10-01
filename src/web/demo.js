@@ -49,14 +49,29 @@ const app = createApp(demoConfig, { signer: fakeSigner });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: -5 });
 app.store.log('reminder', { title: 'Management de projets digitaux – AUTONOMIE', offset: 0 });
 
-// faux WhatsApp : DEMO_WA=qr|code|syncing|ready|error pour voir chaque écran
+// fausses messageries : DEMO_CHANNEL=telegram|whatsapp, DEMO_TG=off|waiting_link|ready, DEMO_WA=qr|code|syncing|ready|error
 const whatsapp = {
   state: { status: process.env.DEMO_WA || 'ready', qr: 'demo-qr-code-emile', code: 'K7QX2M9D', percent: 42, error: 'Échec d’authentification (démo)' },
   async pair() { Object.assign(this.state, { status: 'code', code: 'K7QX2M9D' }); return 'K7QX2M9D'; },
   async reset() { Object.assign(this.state, { status: 'qr' }); },
   async send(text) { console.log('[démo WhatsApp]', text); },
 };
+const telegram = {
+  state: { status: process.env.DEMO_TG || 'waiting_link', username: 'EmileSignature_bot', owner: { name: 'Camille' }, linkCode: '3f9a1c2e', error: null },
+  linkUrl() { return `https://t.me/${this.state.username}?start=${this.state.linkCode}`; },
+  unlink() { this.state.status = 'waiting_link'; },
+  async start(token) { if (token && this.state.status === 'off') this.state.status = 'waiting_link'; },
+  stop() {},
+  async send(text) { console.log('[démo Telegram]', text); },
+};
+const channels = {
+  telegram,
+  whatsapp,
+  get active() { return app.settings.get().channel === 'whatsapp' ? whatsapp : telegram; },
+};
+app.settings.update({ channel: process.env.DEMO_CHANNEL || 'telegram' });
+app.onChannelSettings = (v) => v.channel === 'telegram' && telegram.start(v.telegramToken);
 const port = Number(process.env.WEB_PORT || 3000);
-createWebServer({ app, whatsapp, password: 'demo', dataDir: demoConfig.dataDir }).listen(port, '127.0.0.1', () => {
+createWebServer({ app, channels, password: 'demo', dataDir: demoConfig.dataDir }).listen(port, '127.0.0.1', () => {
   console.log(`Démo Émile : http://localhost:${port}  (mot de passe : demo · code 00000 = échec simulé)`);
 });

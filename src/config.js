@@ -54,6 +54,10 @@ export const config = {
     dryRun: bool(env.SIGN_DRY_RUN, true),
   },
 
+  // Messagerie : telegram (recommandé) ou whatsapp
+  channel: (env.CHANNEL || 'telegram').toLowerCase(),
+  telegram: { token: env.TELEGRAM_BOT_TOKEN || '' },
+
   web: {
     port: Number(env.WEB_PORT || 3000),
     host: env.WEB_HOST || '',

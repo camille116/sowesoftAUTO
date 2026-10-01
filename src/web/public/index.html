@@ -34,7 +34,7 @@
         <span class="brand">Émile</span>
       </div>
       <div class="topbar-status">
-        <span id="pill-whatsapp" class="pill" title="WhatsApp">WhatsApp</span>
+        <span id="pill-channel" class="pill" title="Messagerie">Messagerie</span>
         <span id="pill-mode" class="pill" title="Mode de signature">—</span>
       </div>
     </header>
@@ -71,7 +71,7 @@
             <p id="next-meta" class="muted"></p>
           </article>
           <article class="card">
-            <p class="eyebrow">Rappels WhatsApp</p>
+            <p class="eyebrow">Rappels</p>
             <label class="switch">
               <input type="checkbox" id="toggle-reminders">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -107,8 +107,50 @@
       <section class="view" data-view="settings" hidden>
         <div class="view-head"><h2>Réglages</h2></div>
 
-        <article class="card stack" id="whatsapp-card">
-          <h3>WhatsApp</h3>
+        <article class="card stack" id="messaging-card">
+          <h3>Messagerie</h3>
+          <p class="small muted">Là où Émile t'envoie les rappels et où tu lui envoies les codes.</p>
+          <div class="segmented segmented-full segmented-2" id="channel" role="radiogroup" aria-label="Messagerie">
+            <button type="button" role="radio" data-channel="telegram">Telegram</button>
+            <button type="button" role="radio" data-channel="whatsapp">WhatsApp</button>
+          </div>
+
+          <div data-channel-panel="telegram" class="stack">
+            <p id="tg-text">—</p>
+
+            <div id="tg-setup" class="stack" hidden>
+              <ol class="steps">
+                <li>Dans Telegram, ouvre <a href="https://t.me/BotFather" target="_blank" rel="noopener"><b>@BotFather</b></a> et envoie <code>/newbot</code></li>
+                <li>Nom : <b>Émile</b> · identifiant : par exemple <b>EmileSignature_bot</b> (il doit finir par « bot »)</li>
+                <li>BotFather te donne un <b>token</b> (<code>123456789:AAH…</code>) : colle-le ici</li>
+              </ol>
+              <form id="tg-token-form" class="row pair-form">
+                <input id="tg-token" class="input" placeholder="Token du bot" autocomplete="off" spellcheck="false" aria-label="Token du bot Telegram">
+                <button class="btn btn-primary" type="submit">Valider</button>
+              </form>
+            </div>
+
+            <div id="tg-link" class="pair-code" hidden>
+              <p class="eyebrow">Dernière étape</p>
+              <p class="small">Relie le bot à <b>ton</b> compte Telegram : il n'obéira qu'à toi.</p>
+              <div class="row" style="align-items:center;margin-top:10px">
+                <a id="tg-link-btn" class="btn btn-primary" target="_blank" rel="noopener">Relier Telegram</a>
+                <span class="small muted">ou envoie <code id="tg-code">—</code> à <b id="tg-username">ton bot</b></span>
+              </div>
+              <img id="tg-qr" alt="QR code pour ouvrir le bot sur ton téléphone" width="180" height="180" hidden>
+              <p class="small muted center">Sur ordinateur ? Scanne ce QR avec ton téléphone.</p>
+            </div>
+
+            <div class="row">
+              <button class="btn btn-primary" type="button" data-notif-test id="tg-test" hidden>🔔 Envoyer une notif de test</button>
+              <button class="btn btn-ghost" type="button" id="tg-unlink" hidden>Relier un autre compte</button>
+              <button class="btn btn-ghost" type="button" id="tg-change" hidden>Changer de bot</button>
+            </div>
+          </div>
+
+          <div data-channel-panel="whatsapp" class="stack" hidden>
+            <p class="small muted">Non officiel : relie ton WhatsApp comme un « appareil connecté ». Telegram est plus simple et plus fiable.</p>
+
           <p id="wa-text">—</p>
           <div id="wa-progress" class="progress progress-ink" hidden><span></span></div>
           <img id="wa-qr" alt="QR code à scanner avec WhatsApp" hidden width="240" height="240">
@@ -140,6 +182,7 @@
             <button id="wa-test" class="btn btn-primary" type="button" data-notif-test hidden>🔔 Envoyer une notif de test</button>
             <button id="wa-reset" class="btn btn-ghost" type="button" hidden>Réinitialiser WhatsApp</button>
           </div>
+                  </div>
         </article>
 
         <form id="settings-form" class="card stack">

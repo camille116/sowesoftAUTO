@@ -49,12 +49,12 @@ if [ ! -f "$APP_DIR/.env" ]; then
   bold "⚙️  Configuration"
   echo "  (Les identifiants SoWeSoft se mettent ensuite dans l'appli, onglet Réglages.)"
   echo
-  read -r -p "  Ton numéro WhatsApp (ex : 0612345678) : " PHONE
+  echo "  Émile t'écrit sur Telegram (tu le relies dans l'appli). WhatsApp reste possible en option."
+  read -r -p "  Ton numéro WhatsApp, seulement si tu veux WhatsApp (Entrée pour passer) : " PHONE
   PHONE="$(echo "$PHONE" | tr -cd '0-9')"
   case "$PHONE" in
     0*) PHONE="33${PHONE#0}" ;;
   esac
-  [ ${#PHONE} -ge 10 ] || fail "Numéro invalide."
   read -r -p "  Ton lien iCal Hyperplanning (Entrée pour passer) : " ICS
   while :; do
     read -r -s -p "  Choisis un mot de passe pour l'appli Émile : " WEBPW; echo
@@ -126,9 +126,10 @@ open "http://localhost:3000/#settings" || true
 bold "🎉 C'est prêt !"
 cat <<TXT
   1. L'appli vient de s'ouvrir (http://localhost:3000). Entre ton mot de passe.
-  2. Réglages → scanne le QR code avec WhatsApp (Appareils connectés → Connecter un appareil).
+  2. Réglages → Messagerie → Telegram : crée ton bot avec @BotFather, colle le token, puis « Relier Telegram ».
   3. Réglages → Connexion SoWeSoft : mets ton e-mail et ton mot de passe, Enregistrer, puis « Tester la connexion ».
-  4. Le mode test est activé : au 1er code, vérifie la capture, puis désactive-le.
+  4. « Envoyer une notif de test » pour vérifier que les rappels arrivent.
+  5. Le mode test est activé : au 1er code, vérifie la capture, puis désactive-le.
 
   Pour que le bot reste actif :
   • garde le Mac branché sur secteur et l'écran ouvert ;

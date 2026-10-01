@@ -24,21 +24,27 @@ Double-clique sur le ZIP dans **Téléchargements** pour le décompresser.
 Le script :
 - copie Émile dans le dossier `~/Emile` ;
 - installe ce qu'il faut, dont le navigateur du robot (2 à 5 minutes la première fois) ;
-- te demande **ton numéro WhatsApp**, **ton lien iCal** et **un mot de passe pour l'appli** ;
+- te demande **ton lien iCal** et **un mot de passe pour l'appli** (ton numéro WhatsApp seulement si tu choisis WhatsApp) ;
 - lance Émile en arrière-plan, avec redémarrage automatique ;
 - ouvre l'appli dans ton navigateur.
 
 > Si macOS demande « Autoriser *node* à accepter les connexions entrantes ? », réponds **Autoriser**. C'est ce qui te permet d'ouvrir l'appli depuis ton téléphone.
 
-## 4. Connecter WhatsApp et SoWeSoft (dans l'appli)
+## 4. Relier Telegram et SoWeSoft (dans l'appli)
 
 L'appli s'ouvre sur **http://localhost:3000**. Entre le mot de passe que tu viens de choisir, puis va dans **Réglages** :
 
-1. **WhatsApp** : sur ton téléphone, va dans WhatsApp → Réglages → **Appareils connectés** → **Connecter un appareil**, et scanne le QR code.
-2. **Connexion SoWeSoft** : choisis **E-mail**, remplis ton e-mail et ton mot de passe SoWeSoft, puis **Enregistrer**.
-3. Clique sur **Tester la connexion SoWeSoft** : tu dois voir « Connexion SoWeSoft OK ».
+1. **Messagerie → Telegram** : crée ton bot (2 minutes)
+   - dans Telegram, ouvre **@BotFather** et envoie `/newbot` ;
+   - nom : **Émile** ; identifiant : par exemple **EmileSignature_bot** (il doit finir par « bot ») ;
+   - BotFather te répond avec un **token** (`123456789:AAH…`) : copie-le, colle-le dans l'appli, puis **Valider**.
+2. Clique sur **Relier Telegram**. Telegram s'ouvre : appuie sur **Démarrer**. Sur ordinateur, tu peux aussi scanner le QR avec ton téléphone. Le bot n'obéira qu'à toi.
+3. **🔔 Envoyer une notif de test** : tu dois recevoir le message sur Telegram.
+4. **Connexion SoWeSoft** : choisis **E-mail**, remplis ton e-mail et ton mot de passe SoWeSoft, **Enregistrer**, puis **Tester la connexion SoWeSoft**.
 
-Émile t'envoie alors « Émile est en ligne » sur WhatsApp, dans la discussion avec toi-même (« Moi (Vous) »).
+Ensuite, parle à Émile dans Telegram : envoie le code à 5 chiffres pour signer, `/planning`, `/aide`… (le menu ☰ du bot liste les commandes).
+
+> Tu préfères WhatsApp ? Réglages → Messagerie → **WhatsApp**, puis scanne le QR code (Appareils connectés → Connecter un appareil). C'est moins fiable que Telegram, car ce n'est pas une connexion officielle.
 
 ## 5. Garder le Mac éveillé
 
@@ -67,4 +73,4 @@ Ensuite, utilise **Partager → Sur l'écran d'accueil** dans Safari pour l'avoi
 
 - **« Node.js n'est pas installé »** : refais l'étape 1, puis ferme et rouvre le Terminal.
 - **L'appli ne s'ouvre pas** : regarde le journal (`tail -n 50 ~/Emile/data/emile.log`) et envoie-le-moi.
-- **Plus de rappels** : vérifie que le Mac n'est pas en veille et que l'appli affiche « WhatsApp connecté ».
+- **Plus de rappels** : vérifie que le Mac n'est pas en veille et que l'appli affiche « Telegram relié ».

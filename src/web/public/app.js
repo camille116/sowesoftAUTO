@@ -71,6 +71,10 @@ $('#login-form').addEventListener('submit', async (e) => {
 });
 
 // ── Accueil ───────────────────────────────────────────────
+const TG = {
+  ready: ['Telegram relié', 'ok'], waiting_link: ['Telegram à relier', 'warn'], starting: ['Telegram démarre', 'warn'],
+  error: ['Erreur Telegram', 'danger'], off: ['Telegram à configurer', 'warn'],
+};
 const WA = {
   ready: ['WhatsApp connecté', 'ok'], qr: ['WhatsApp à connecter', 'warn'], code: ['WhatsApp à connecter', 'warn'],
   starting: ['WhatsApp démarre', 'warn'], syncing: ['WhatsApp se synchronise', 'warn'],
@@ -81,10 +85,13 @@ async function loadStatus() {
   let s;
   try { s = await api('/api/status'); } catch { return; }
 
-  const [waText, waClass] = WA[s.whatsapp] || WA.off;
-  const pillWa = $('#pill-whatsapp');
-  pillWa.textContent = waText;
-  pillWa.className = `pill ${waClass}`;
+  const { channel, status } = s.messaging;
+  const [chText, chClass] = channel === 'whatsapp'
+    ? (WA[status] || WA.off)
+    : (TG[status] || TG.off);
+  const pill = $('#pill-channel');
+  pill.textContent = chText;
+  pill.className = `pill ${chClass}`;
   const pillMode = $('#pill-mode');
   pillMode.textContent = s.dryRun ? 'Mode test' : 'Signature réelle';
   pillMode.className = `pill ${s.dryRun ? 'warn' : 'ok'}`;
@@ -130,7 +137,7 @@ function renderResult(el, r, { okText, testText }) {
   const title = r.dryRun ? testText : r.ok ? okText : 'Ça n’a pas marché';
   const text = r.dryRun
     ? 'J’ai tapé les 4 premiers chiffres et je me suis arrêté. Vérifie la capture, puis désactive le mode test dans Réglages.'
-    : r.ok ? 'SoWeSoft a confirmé. Une copie t’est envoyée sur WhatsApp.' : `${r.reason || 'Erreur inconnue'}. Signe à la main sur SoWeSoft si besoin.`;
+    : r.ok ? 'SoWeSoft a confirmé. Une copie t’est envoyée sur ta messagerie.' : `${r.reason || 'Erreur inconnue'}. Signe à la main sur SoWeSoft si besoin.`;
   el.innerHTML = `
     <div class="row" style="align-items:flex-start;flex-wrap:nowrap">
       ${r.screenshot ? `<img class="thumb" src="/api/screenshots/${encodeURIComponent(r.screenshot)}" data-shot="${esc(r.screenshot)}" alt="Capture SoWeSoft">` : ''}
@@ -245,7 +252,7 @@ function describe(h) {
     case 'resume': return ['▶️', 'Rappels réactivés'];
     case 'test': return [h.ok ? '🔌' : '⚠️', h.ok ? 'Connexion SoWeSoft OK' : 'Connexion SoWeSoft échouée', h.reason];
     case 'settings': return ['⚙️', 'Réglages modifiés'];
-    case 'notif-test': return ['📱', 'Notification de test envoyée'];
+    case 'notif-test': return ['📱', `Notification de test envoyée${h.channel ? ` (${h.channel})` : ''}`];
     default: return ['•', h.type];
   }
 }
@@ -332,8 +339,8 @@ document.addEventListener('click', async (e) => {
   if (!btn) return;
   btn.disabled = true;
   try {
-    await api('/api/whatsapp/test', {});
-    toast('Notif envoyée ! Regarde WhatsApp 📱');
+    const r = await api('/api/notify-test', {});
+    toast(`Notif envoyée ! Regarde ${r.channel} 📱`);
   } catch (err) { toast(err.message); }
   btn.disabled = false;
 });
@@ -347,10 +354,86 @@ $('#wa-reset').addEventListener('click', async () => {
   setTimeout(loadWhatsApp, 1500);
 });
 
+// ── Messagerie : Telegram / WhatsApp ─────────────────────
+let channel = 'telegram';
+let tgTimer;
+let tgEditing = false;
+
+function setChannel(c) {
+  channel = c;
+  $$('#channel button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.channel === c)));
+  $$('[data-channel-panel]').forEach((el) => (el.hidden = el.dataset.channelPanel !== c));
+  clearTimeout(tgTimer);
+  clearTimeout(qrTimer);
+  if (c === 'telegram') loadTelegram();
+  else loadWhatsApp();
+}
+
+$('#channel').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-channel]');
+  if (!b || b.dataset.channel === channel) return;
+  try {
+    await api('/api/settings', { channel: b.dataset.channel });
+    toast(b.dataset.channel === 'telegram' ? 'Messagerie : Telegram' : 'Messagerie : WhatsApp (démarrage…)');
+    setChannel(b.dataset.channel);
+    loadStatus();
+  } catch (err) { toast(err.message); }
+});
+
+async function loadTelegram() {
+  clearTimeout(tgTimer);
+  let t;
+  try { t = await api('/api/telegram'); } catch { return; }
+  const text = {
+    off: 'Crée ton bot Telegram en 2 minutes :',
+    starting: '⏳ Connexion à Telegram…',
+    waiting_link: `✅ Bot <b>@${esc(t.username)}</b> prêt.`,
+    ready: `✅ Relié à <b>${esc(t.owner)}</b> via <b>@${esc(t.username)}</b>. Les rappels arrivent sur Telegram.`,
+    error: `❌ ${esc(t.error || 'Erreur Telegram')}`,
+  }[t.status] || '—';
+  $('#tg-text').innerHTML = text;
+
+  const setup = t.status === 'off' || t.status === 'error' || tgEditing;
+  $('#tg-setup').hidden = !setup;
+  $('#tg-link').hidden = t.status !== 'waiting_link' || setup;
+  if (t.link) {
+    $('#tg-link-btn').href = t.link;
+    $('#tg-code').textContent = t.linkCode;
+    $('#tg-username').textContent = `@${t.username}`;
+  }
+  $('#tg-qr').hidden = !t.qr;
+  if (t.qr) $('#tg-qr').src = t.qr;
+  $('#tg-test').hidden = t.status !== 'ready';
+  $('#tg-unlink').hidden = t.status !== 'ready';
+  $('#tg-change').hidden = setup || t.status === 'off';
+
+  if (t.status !== 'ready' && channel === 'telegram' && !$('[data-view="settings"]').hidden) tgTimer = setTimeout(loadTelegram, 3000);
+}
+
+$('#tg-token-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const token = $('#tg-token').value.trim();
+  if (!token) return toast('Colle le token donné par @BotFather');
+  try {
+    await api('/api/settings', { telegramToken: token, channel: 'telegram' });
+    $('#tg-token').value = '';
+    tgEditing = false;
+    toast('Token enregistré');
+    setTimeout(loadTelegram, 800);
+  } catch (err) { toast(err.message); }
+});
+
+$('#tg-change').addEventListener('click', () => { tgEditing = true; loadTelegram(); });
+$('#tg-unlink').addEventListener('click', async () => {
+  if (!confirm('Délier ce compte Telegram ? Tu pourras relier un autre compte.')) return;
+  await api('/api/telegram/unlink', {}).catch((err) => toast(err.message));
+  loadTelegram();
+});
+
 async function loadSettings() {
-  loadWhatsApp();
   let s;
   try { s = await api('/api/settings'); } catch { return; }
+  setChannel(s.channel || 'telegram');
   const f = $('#settings-form');
   f.institution.value = s.auth.institution || '';
   f.email.value = s.auth.email || '';

@@ -120,6 +120,7 @@ main { display: block; }
   font: 600 1rem/1 var(--font); padding: 12px 18px; min-height: 44px;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   transition: transform .08s ease, background .2s ease, opacity .2s;
+  text-decoration: none;
 }
 .btn:active { transform: scale(.98); }
 .btn[disabled] { opacity: .6; cursor: progress; }
@@ -278,3 +279,7 @@ main { display: block; }
 @media (max-width: 420px) { .slot { grid-template-columns: auto 1fr; } .slot-actions { grid-column: 1 / -1; justify-content: flex-end; } }
 
 .btn-sm { min-height: 38px; padding: 8px 14px; font-size: .9rem; margin-top: 10px; }
+
+.segmented-2 { grid-template-columns: repeat(2, 1fr); }
+#tg-qr { display: block; margin: 12px auto 4px; border-radius: 12px; background: #fff; padding: 6px; }
+.steps a { color: var(--focus); }

@@ -159,6 +159,7 @@ Le **cerveau** (`src/bot.js`) ne dépend pas de WhatsApp : on pourra brancher Te
 | **S1 – MVP** | Planning ICS + manuel, rappels progressifs, signature par code, mode test, captures, Docker | ✅ livré |
 | **S2 – Calibrage** | Parcours réel SoWeSoft OMNES relevé et testé (connexion, popup, saisie du code) ; 1 semaine en mode test puis passage en réel | 🟡 en cours |
 | **S2 bis – Appli** | Appli web installable (PWA) : accueil + signature, planning, historique avec captures, réglages, QR WhatsApp | ✅ livré |
+| **S2 ter – Telegram** | Bot Telegram officiel (recommandé), WhatsApp en option, choix dans l'appli, notif de test | ✅ livré |
 | **S3 – Confort** | Récap du soir (« 2/2 signés aujourd'hui »), alerte si la session Sowesoft expire, code reçu par mail lu automatiquement (connecteur Gmail) | 💡 |
 | **S4 – Promo** | Multi-utilisateurs, API WhatsApp Business officielle, mini-dashboard d'assiduité | 💡 (avec accord de l'école) |
 
