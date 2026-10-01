@@ -1,0 +1,11 @@
+{
+  "_aide": "Créneaux d'autonomie récurrents (weekly) et ponctuels (dates). 'exceptions' = jours sans cours (vacances, fériés). Format heure HH:MM, date AAAA-MM-JJ.",
+  "weekly": [
+    { "day": "mardi", "start": "13:30", "end": "17:00", "title": "Autonomie – projet" },
+    { "day": "vendredi", "start": "09:00", "end": "12:30", "title": "Autonomie" }
+  ],
+  "dates": [
+    { "date": "2026-10-14", "start": "09:00", "end": "12:00", "title": "Autonomie – rattrapage" }
+  ],
+  "exceptions": ["2026-10-27", "2026-10-30"]
+}

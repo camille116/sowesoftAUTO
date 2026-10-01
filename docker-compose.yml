@@ -1,0 +1,12 @@
+services:
+  emile:
+    build: .
+    container_name: emile-sowesoft
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CHROME_PATH: /usr/bin/chromium
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    shm_size: 512mb

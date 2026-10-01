@@ -1,0 +1,35 @@
+{
+  "name": "sowesoft-auto",
+  "version": "1.0.0",
+  "description": "Émile – bot WhatsApp qui rappelle de signer sur Sowesoft/SoWeSign pendant les heures d'autonomie et signe avec le code envoyé",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "planning": "node src/preview.js",
+    "sowesign:inspect": "node src/sowesign/inspect.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/camille116/sowesoftAUTO.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/camille116/sowesoftAUTO/issues"
+  },
+  "homepage": "https://github.com/camille116/sowesoftAUTO#readme",
+  "dependencies": {
+    "dotenv": "^18.0.5",
+    "node-ical": "^0.27.2",
+    "puppeteer": "^24.43.1",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "_aide": "URLs et sélecteurs CSS de la plateforme d'émargement. Valeurs par défaut génériques : vérifie-les avec `npm run sowesign:inspect` (voir README). Plusieurs sélecteurs peuvent être séparés par des virgules.",
+  "url": "https://app.sowesign.com/",
+  "signUrl": "",
+  "selectors": {
+    "username": "input[type=email], input[name=email], input[name=username], input[name=login], #username",
+    "password": "input[type=password]",
+    "loginSubmit": "button[type=submit], input[type=submit]",
+    "loggedIn": "",
+    "openSignature": "",
+    "codeInput": "input[autocomplete=one-time-code], input[name*=code i], input[id*=code i], input[inputmode=numeric]",
+    "codeSubmit": "button[type=submit], input[type=submit]"
+  },
+  "successTexts": ["signature enregistrée", "émargement enregistré", "présence enregistrée", "merci", "signé"],
+  "errorTexts": ["code incorrect", "code invalide", "code expiré", "erreur", "invalid"],
+  "timeoutMs": 20000
+}
