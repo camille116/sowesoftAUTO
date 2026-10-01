@@ -66,7 +66,8 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     signer.auth = v.auth;
     signer.loginLocked = null; // nouveaux identifiants : on autorise un nouvel essai
     store.log('settings');
-    if (v.channel !== before.channel || v.telegramToken !== before.telegramToken || v.whatsappNumber !== before.whatsappNumber) app.onChannelSettings?.(v);
+    if (v.channel !== before.channel || v.telegramToken !== before.telegramToken || v.whatsappNumber !== before.whatsappNumber
+        || v.relayUrl !== before.relayUrl || v.relaySecret !== before.relaySecret) app.onChannelSettings?.(v);
     return settings.public();
   }
 

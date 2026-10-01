@@ -64,23 +64,28 @@ const relay = createRelayClient({
 });
 app.relay = relay;
 
-// Le bot Telegram : en mode normal il écoute (long polling) ; si le relais est configuré,
-// c'est le cloud qui écoute (webhook) et le Mac ne fait qu'envoyer.
+// Le bot Telegram : par défaut le Mac écoute (long polling). Si le relais est configuré ET
+// que son webhook s'enregistre, c'est le cloud qui écoute et le Mac ne fait qu'envoyer.
+// SÉCURITÉ : si le webhook échoue (relais pas à jour), le Mac continue d'écouter → les commandes marchent toujours.
 let telegramKey = null;
-function applyChannel(s) {
-  const sendOnly = relay.isConfigured();
-  const key = `${s.telegramToken}|${sendOnly}`;
+async function applyChannel(s) {
+  const key = `${s.telegramToken || ''}|${relay.isConfigured()}|${app.settings.get().relayUrl}`;
   if (key !== telegramKey) {
     telegramKey = key;
+    let sendOnly = false;
+    if (relay.isConfigured() && s.telegramToken) {
+      const r = await relay.setupWebhook().catch(() => ({ ok: false }));
+      sendOnly = Boolean(r.ok);
+      log.info(sendOnly ? 'Relais : webhook activé → le cloud reçoit les commandes' : 'Relais : webhook indisponible → le Mac écoute les commandes');
+    }
     telegram.start(s.telegramToken, { sendOnly });
-    if (sendOnly && s.telegramToken) relay.setupWebhook().then((r) => log.info(`Relais : webhook ${r.ok ? 'activé' : 'non activé'}`)).catch((e) => log.warn(`Webhook : ${e.message}`));
   }
   if (s.channel === 'whatsapp') ensureWhatsApp();
 }
 
 app.channel.send = (...args) => channels.active.send(...args);
-app.onChannelSettings = applyChannel;
-applyChannel(app.settings.get());
+app.onChannelSettings = (s) => applyChannel(s).catch((e) => log.error(e));
+applyChannel(app.settings.get()).catch((e) => log.error(e));
 relay.start();
 
 // ── Rappels ─────────────────────────────────────────────────
