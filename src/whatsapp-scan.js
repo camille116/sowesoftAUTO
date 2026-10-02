@@ -29,7 +29,7 @@ export function extractCode(text) {
  */
 export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, clientFactory }) {
   const sessionDir = join(dataDir, 'whatsapp-scan-session');
-  const state = { status: 'off', qr: null, error: null, group: null, since: Date.now() };
+  const state = { status: 'off', qr: null, error: null, group: null, since: Date.now(), seen: 0, lastSeen: null };
   const tried = new Map(); // code → timestamp
   let client = null;
   let running = false;
@@ -50,10 +50,15 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
    */
   async function handleMessage(message) {
     try {
+      state.seen = (state.seen || 0) + 1; // diagnostic : combien de messages le scan voit passer
       const cfg = getConfig();
       if (!cfg?.enabled) return;
-      if (!message || message.type !== 'chat' || !message.body) return;
+      if (!message || message.type !== 'chat' || !message.body) {
+        state.lastSeen = { at: Date.now(), note: `message non-texte (${message?.type || '?'})` };
+        return;
+      }
       const chat = await message.getChat();
+      state.lastSeen = { at: Date.now(), where: chat?.isGroup ? (chat.name || 'groupe') : 'message direct', code: extractCode(message.body) || null };
       const id = chat?.id?._serialized || chat?.id;
       // Si un groupe précis est choisi : on ne lit que celui-là.
       // Sinon (« Tous les groupes ») : on lit tous les groupes ET les messages directs (pratique pour tester).

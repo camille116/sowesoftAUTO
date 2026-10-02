@@ -553,15 +553,23 @@ async function loadScan() {
   st.textContent = s.enabled ? (s.status === 'error' ? (SCAN_LABEL.error + (s.error || 'erreur')) : SCAN_LABEL[s.status] || s.status) : '';
   $('#scan-qr').hidden = !(s.enabled && s.status === 'qr' && s.image);
   if (s.enabled && s.status === 'qr' && s.image) $('#scan-qr-img').src = s.image;
+  const diag = $('#scan-diag');
+  if (diag) {
+    diag.hidden = !(s.enabled && s.status === 'ready');
+    const last = s.lastSeen ? (s.lastSeen.note ? s.lastSeen.note : `${s.lastSeen.where}${s.lastSeen.code ? ` → code ${s.lastSeen.code}` : ' (pas de code)'}`) : 'aucun pour l’instant';
+    diag.textContent = `🔎 Messages lus : ${s.seen || 0} · dernier : ${last}`;
+  }
   const ready = s.enabled && s.status === 'ready';
   $('#scan-group-field').hidden = !ready;
   $('#scan-refresh').hidden = !ready;
   $('#scan-reset').hidden = !s.enabled;
   if (ready && !$('#scan-group').dataset.loaded) refreshGroups(s.groupId);
   else if (ready) setGroupSelection(s.groupId);
-  // rafraîchit tant que ça se connecte (QR → prêt)
+  // rafraîchit tant que ça se connecte (QR → prêt), et garde le compteur à jour sur la page Réglages
   clearTimeout(scanTimer);
+  const onSettings = !$('[data-view="settings"]')?.hidden;
   if (connecting) scanTimer = setTimeout(loadScan, 2500);
+  else if (s.enabled && s.status === 'ready' && onSettings) scanTimer = setTimeout(loadScan, 4000);
 }
 function setGroupSelection(groupId) {
   const sel = $('#scan-group');

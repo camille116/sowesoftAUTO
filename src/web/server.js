@@ -308,7 +308,7 @@ export function createWebServer({ app, channels, updater, desktop, password, dat
       const cfg = settings.get().whatsappScan || {};
       const status = sc?.state?.status || 'off';
       json(res, 200, { enabled: Boolean(cfg.enabled), groupId: cfg.groupId || '', groupName: cfg.groupName || '',
-        status, error: sc?.state?.error || null,
+        status, error: sc?.state?.error || null, seen: sc?.state?.seen || 0, lastSeen: sc?.state?.lastSeen || null,
         image: status === 'qr' && sc?.state?.qr ? await QRCode.toDataURL(sc.state.qr, { margin: 1, width: 260 }) : null });
     },
     'GET /api/whatsapp-scan/groups': async (req, res) => {
