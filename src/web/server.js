@@ -307,13 +307,13 @@ export function createWebServer({ app, channels, updater, desktop, password, dat
       const sc = app.scanner;
       const cfg = settings.get().whatsappScan || {};
       const status = sc?.state?.status || 'off';
-      json(res, 200, { enabled: Boolean(cfg.enabled), groupId: cfg.groupId || '', groupName: cfg.groupName || '',
+      json(res, 200, { enabled: Boolean(cfg.enabled), chatIds: cfg.chatIds || [],
         status, error: sc?.state?.error || null, seen: sc?.state?.seen || 0, lastSeen: sc?.state?.lastSeen || null,
         image: status === 'qr' && sc?.state?.qr ? await QRCode.toDataURL(sc.state.qr, { margin: 1, width: 260 }) : null });
     },
-    'GET /api/whatsapp-scan/groups': async (req, res) => {
-      if (!app.scanner) return json(res, 200, { groups: [] });
-      json(res, 200, { groups: await app.scanner.listGroups().catch(() => []) });
+    'GET /api/whatsapp-scan/chats': async (req, res) => {
+      if (!app.scanner) return json(res, 200, { chats: [] });
+      json(res, 200, { chats: await app.scanner.listChats().catch(() => []) });
     },
     'POST /api/whatsapp-scan/reset': async (req, res) => {
       if (!app.scanner) return json(res, 400, { error: 'Scan indisponible' });

@@ -29,36 +29,37 @@ const groupMsg = (body, { isGroup = true, id = 'G1', name = 'Classe M1' } = {}) 
 const dmMsg = (body, { id = 'D1' } = {}) => ({ type: 'chat', body, getChat: async () => ({ isGroup: false, id: { _serialized: id }, name: 'Pote' }) });
 
 test('scan désactivé : ne signe pas', async () => {
-  const { sc, calls } = scanner({ config: { enabled: false, groupId: 'G1' } });
+  const { sc, calls } = scanner({ config: { enabled: false, chatIds: ['G1'] } });
   await sc.handleMessage(groupMsg('48213'));
   assert.equal(calls.length, 0);
 });
 
-test('sans filtre : message direct accepté (pratique pour tester)', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: '' } });
+test('sans sélection : groupes ET messages directs acceptés', async () => {
+  const { sc, calls } = scanner({ config: { enabled: true, chatIds: [] } });
   await sc.handleMessage(dmMsg('48213'));
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].info.group, 'message direct');
+  await sc.handleMessage(groupMsg('77777', { id: 'G9' }));
+  assert.equal(calls.length, 2);
 });
 
-test('filtre groupe actif : un message direct ou un autre groupe est ignoré', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' } });
-  await sc.handleMessage(groupMsg('48213', { id: 'AUTRE' }));
-  await sc.handleMessage(dmMsg('48213', { id: 'D1' }));
-  assert.equal(calls.length, 0);
+test('conversations sélectionnées : seules celles-là comptent (groupe ou privé)', async () => {
+  const { sc, calls } = scanner({ config: { enabled: true, chatIds: ['G1', 'D1'] } });
+  await sc.handleMessage(groupMsg('48213', { id: 'AUTRE' })); // non sélectionné → ignoré
+  await sc.handleMessage(dmMsg('11111', { id: 'D1' })); // sélectionné → compté
+  await sc.handleMessage(groupMsg('22222', { id: 'G1' })); // sélectionné → compté
+  assert.deepEqual(calls.map((c) => c.code), ['11111', '22222']);
 });
 
-test('code dans le bon groupe : remonté une seule fois (dédup)', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' } });
+test('ancien réglage groupId repris automatiquement', async () => {
+  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' } }); // pas de chatIds
+  await sc.handleMessage(groupMsg('48213', { id: 'G1' }));
+  await sc.handleMessage(dmMsg('11111', { id: 'D1' }));
+  assert.deepEqual(calls.map((c) => c.code), ['48213']);
+});
+
+test('code dans la conversation : remonté une seule fois (dédup)', async () => {
+  const { sc, calls } = scanner({ config: { enabled: true, chatIds: [] } });
   await sc.handleMessage(groupMsg('le code 48213'));
   await sc.handleMessage(groupMsg('48213 encore')); // même code → pas de 2e remontée
   assert.equal(calls.length, 1);
   assert.equal(calls[0].code, '48213');
-  assert.equal(calls[0].info.group, 'Classe M1');
-});
-
-test('groupId vide : accepte n’importe quel groupe', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: '' } });
-  await sc.handleMessage(groupMsg('48213', { id: 'NIMPORTE' }));
-  assert.equal(calls.length, 1);
 });

@@ -27,7 +27,7 @@ export function extractCode(text) {
  * message avec ton compte WhatsApp. Les retours (code repéré, signé/échoué) partent sur Telegram.
  * Session dédiée (dossier séparé) → à utiliser de préférence avec un compte WhatsApp secondaire.
  */
-export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, clientFactory }) {
+export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, clientFactory, webVersion }) {
   const sessionDir = join(dataDir, 'whatsapp-scan-session');
   const state = { status: 'off', qr: null, error: null, group: null, since: Date.now(), seen: 0, lastSeen: null };
   const tried = new Map(); // code → timestamp
@@ -58,16 +58,15 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
         return;
       }
       const chat = await message.getChat();
-      state.lastSeen = { at: Date.now(), where: chat?.isGroup ? (chat.name || 'groupe') : 'message direct', code: extractCode(message.body) || null };
-      const id = chat?.id?._serialized || chat?.id;
-      // Si un groupe précis est choisi : on ne lit que celui-là.
-      // Sinon (« Tous les groupes ») : on lit tous les groupes ET les messages directs (pratique pour tester).
-      if (cfg.groupId) { if (id !== cfg.groupId) return; }
-      else if (!chat?.isGroup && !chat?.id) return;
+      const id = chat?.id?._serialized || String(chat?.id || '');
+      const where = chat?.isGroup ? (chat.name || 'groupe') : (chat?.name ? `${chat.name} (privé)` : 'message direct');
+      state.lastSeen = { at: Date.now(), where, code: extractCode(message.body) || null };
+      // Conversations choisies : liste d'ids (groupes et/ou privés). Vide = on surveille tout.
+      const chatIds = cfg.chatIds || (cfg.groupId ? [cfg.groupId] : []);
+      if (chatIds.length && !chatIds.includes(id)) return;
       const code = extractCode(message.body);
       if (!code || recentlyTried(code)) return;
       tried.set(code, Date.now());
-      const where = chat?.isGroup ? chat.name : 'message direct';
       log.info(`WhatsApp scan : code ${code} repéré (${where})`);
       await onDetect(code, { group: where });
     } catch (err) {
@@ -76,8 +75,14 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
   }
 
   function makeClient() {
+    // Épingler une version de WhatsApp Web connue stable aide parfois à recevoir les messages
+    // (quand la version servie par WhatsApp casse les événements). Pilotable par WA_WEB_VERSION.
+    const webVersionCache = webVersion
+      ? { type: 'remote', remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${webVersion}.html` }
+      : undefined;
     const c = clientFactory ? clientFactory() : new Client({
       authStrategy: new LocalAuth({ dataPath: sessionDir, clientId: 'scan' }),
+      ...(webVersionCache ? { webVersionCache } : {}),
       puppeteer: {
         headless: browser.headless,
         executablePath: browser.executablePath,
@@ -132,17 +137,17 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
     if (wasRunning) start();
   }
 
-  /** Liste les groupes WhatsApp du compte (pour choisir lequel surveiller). */
-  async function listGroups() {
+  /** Liste les conversations WhatsApp (groupes ET privées) pour choisir celles à surveiller. */
+  async function listChats() {
     if (!client || state.status !== 'ready') return [];
-    // WhatsApp charge les conversations en différé : on réessaie quelques fois.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const chats = await client.getChats().catch((e) => { log.warn(`WhatsApp scan : liste des groupes impossible (${e.message})`); return []; });
-      const groups = chats.filter((c) => c.isGroup).map((c) => ({ id: c.id?._serialized || String(c.id), name: c.name || c.formattedTitle || '(sans nom)' }));
-      if (groups.length) { log.info(`WhatsApp scan : ${groups.length} groupe(s) visible(s)`); return groups; }
+    for (let attempt = 0; attempt < 3; attempt++) { // WhatsApp charge les conversations en différé
+      const chats = await client.getChats().catch((e) => { log.warn(`WhatsApp scan : liste des conversations impossible (${e.message})`); return []; });
+      const list = chats.map((c) => ({ id: c.id?._serialized || String(c.id), name: c.name || c.formattedTitle || '(sans nom)', isGroup: Boolean(c.isGroup) }))
+        .sort((a, b) => (b.isGroup - a.isGroup) || a.name.localeCompare(b.name));
+      if (list.length) { log.info(`WhatsApp scan : ${list.length} conversation(s) visible(s)`); return list; }
       if (attempt < 2) await sleep(1500);
     }
-    log.info('WhatsApp scan : aucun groupe visible pour le moment (chats pas encore synchronisés ?)');
+    log.info('WhatsApp scan : aucune conversation visible (sync WhatsApp incomplète ?)');
     return [];
   }
 
@@ -154,5 +159,5 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
     setState({ group: cfg?.groupName || null });
   }
 
-  return { state, start, stop, reset, apply, listGroups, handleMessage, get client() { return client; } };
+  return { state, start, stop, reset, apply, listChats, handleMessage, get client() { return client; } };
 }

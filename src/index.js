@@ -95,6 +95,7 @@ relay.start();
 const scanner = createWhatsAppScanner({
   dataDir: config.dataDir,
   browser: config.browser,
+  webVersion: process.env.WA_WEB_VERSION || null, // épingler une version WhatsApp Web si la réception casse
   getConfig: () => app.settings.get().whatsappScan,
   onDetect: async (code, { group } = {}) => {
     // 1) on prévient toujours sur Telegram qu'un code a été repéré

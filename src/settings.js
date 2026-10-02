@@ -87,11 +87,15 @@ export class Settings {
 
     if (patch.whatsappScan) {
       const w = patch.whatsappScan;
-      const cur = next.whatsappScan || { enabled: false, groupId: '', groupName: '' };
+      const cur = next.whatsappScan || { enabled: false, chatIds: [], chatNames: {} };
+      const chatIds = 'chatIds' in w
+        ? [...new Set(toList(w.chatIds))].slice(0, 50)
+        : (cur.chatIds || (cur.groupId ? [cur.groupId] : [])); // reprise de l'ancien réglage « groupId »
+      const chatNames = 'chatNames' in w && w.chatNames && typeof w.chatNames === 'object' ? w.chatNames : (cur.chatNames || {});
       next.whatsappScan = {
         enabled: 'enabled' in w ? Boolean(w.enabled) : cur.enabled,
-        groupId: 'groupId' in w ? String(w.groupId || '').trim() : cur.groupId,
-        groupName: 'groupName' in w ? String(w.groupName || '').trim().slice(0, 80) : cur.groupName,
+        chatIds,
+        chatNames,
       };
     }
 

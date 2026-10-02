@@ -27,7 +27,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     relayUrl: '', relaySecret: '',
     telegramToken: config.telegram?.token || '',
     signature: { style: 'claude', name: 'Camille Redon' },
-    whatsappScan: { enabled: false, groupId: '', groupName: '' },
+    whatsappScan: { enabled: false, chatIds: [], chatNames: {} },
   });
   const s = settings.get();
 

@@ -563,45 +563,55 @@ async function loadScan() {
   $('#scan-group-field').hidden = !ready;
   $('#scan-refresh').hidden = !ready;
   $('#scan-reset').hidden = !s.enabled;
-  if (ready && !$('#scan-group').dataset.loaded) refreshGroups(s.groupId);
-  else if (ready) setGroupSelection(s.groupId);
+  scanSelected = new Set(s.chatIds || []);
+  if (ready && !$('#scan-chat-list').dataset.loaded) refreshChats();
+  else if (ready) renderChatChecks();
   // rafraîchit tant que ça se connecte (QR → prêt), et garde le compteur à jour sur la page Réglages
   clearTimeout(scanTimer);
   const onSettings = !$('[data-view="settings"]')?.hidden;
   if (connecting) scanTimer = setTimeout(loadScan, 2500);
   else if (s.enabled && s.status === 'ready' && onSettings) scanTimer = setTimeout(loadScan, 4000);
 }
-function setGroupSelection(groupId) {
-  const sel = $('#scan-group');
-  if (sel && [...sel.options].some((o) => o.value === groupId)) sel.value = groupId || '';
+let scanChats = [];
+let scanSelected = new Set();
+function renderChatChecks() {
+  const ul = $('#scan-chat-list');
+  if (!ul) return;
+  ul.innerHTML = scanChats.map((c) => `<li><label class="switch-row"><input type="checkbox" data-chat="${c.id}" ${scanSelected.has(c.id) ? 'checked' : ''}><span>${c.isGroup ? '👥' : '👤'} ${c.name}</span></label></li>`).join('')
+    || '<li class="muted small">Aucune conversation visible pour le moment.</li>';
 }
-async function refreshGroups(selectId, { notify = false } = {}) {
-  const sel = $('#scan-group');
-  if (!sel) return;
+async function saveScanChats() {
+  try { await api('/api/settings', { whatsappScan: { chatIds: [...scanSelected] } }); toast('Conversations enregistrées'); }
+  catch (err) { toast(err.message); }
+}
+async function refreshChats({ notify = false } = {}) {
+  const ul = $('#scan-chat-list');
+  if (!ul) return;
   try {
-    const { groups } = await api('/api/whatsapp-scan/groups');
-    sel.innerHTML = '<option value="">Tous les groupes</option>' + groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
-    sel.dataset.loaded = '1';
-    setGroupSelection(selectId || '');
+    const { chats } = await api('/api/whatsapp-scan/chats');
+    scanChats = chats;
+    ul.dataset.loaded = '1';
+    renderChatChecks();
     const hint = $('#scan-group-hint');
-    if (hint) hint.textContent = groups.length
-      ? `${groups.length} groupe${groups.length > 1 ? 's' : ''} trouvé${groups.length > 1 ? 's' : ''}. Laisse « Tous les groupes » si tu préfères ne pas filtrer.`
-      : 'Aucun groupe trouvé : ce compte WhatsApp est-il bien membre du groupe de ta classe ? (La synchro peut prendre 1–2 min — réessaie.) « Tous les groupes » fonctionne quand même.';
-    if (notify) toast(groups.length ? `${groups.length} groupe(s) trouvé(s)` : 'Aucun groupe trouvé pour ce compte');
+    if (hint) hint.textContent = chats.length
+      ? `${chats.length} conversation(s). Coche celles à surveiller — rien de coché = tout est surveillé.`
+      : 'Aucune conversation visible : ce compte est-il bien connecté et dans le groupe ? (La synchro peut prendre 1–2 min — réessaie.) Rien de coché = tout est surveillé de toute façon.';
+    if (notify) toast(chats.length ? `${chats.length} conversation(s) trouvée(s)` : 'Aucune conversation trouvée');
   } catch { if (notify) toast('Pas encore prêt, réessaie dans un instant'); }
 }
+$('#scan-chat-list')?.addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-chat]');
+  if (!cb) return;
+  if (cb.checked) scanSelected.add(cb.dataset.chat); else scanSelected.delete(cb.dataset.chat);
+  saveScanChats();
+});
 $('#scan-enabled')?.addEventListener('change', async (e) => {
   try { await api('/api/settings', { whatsappScan: { enabled: e.target.checked } }); toast(e.target.checked ? 'Scan activé' : 'Scan désactivé'); loadScan(); }
   catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
 });
-$('#scan-group')?.addEventListener('change', async (e) => {
-  const name = e.target.selectedOptions[0]?.textContent || '';
-  try { await api('/api/settings', { whatsappScan: { groupId: e.target.value, groupName: e.target.value ? name : '' } }); toast('Groupe enregistré'); }
-  catch (err) { toast(err.message); }
-});
-$('#scan-refresh')?.addEventListener('click', () => { $('#scan-group').dataset.loaded = ''; refreshGroups($('#scan-group').value, { notify: true }); });
+$('#scan-refresh')?.addEventListener('click', () => { $('#scan-chat-list').dataset.loaded = ''; refreshChats({ notify: true }); });
 $('#scan-reset')?.addEventListener('click', async () => {
-  try { await api('/api/whatsapp-scan/reset', {}); $('#scan-group').dataset.loaded = ''; toast('Session WhatsApp oubliée'); loadScan(); }
+  try { await api('/api/whatsapp-scan/reset', {}); $('#scan-chat-list').dataset.loaded = ''; toast('Session WhatsApp oubliée'); loadScan(); }
   catch (err) { toast(err.message); }
 });
 

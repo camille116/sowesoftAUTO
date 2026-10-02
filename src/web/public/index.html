@@ -345,13 +345,13 @@
               <p class="muted small">Scanne ce QR depuis le téléphone du compte à surveiller (WhatsApp → Appareils connectés → Connecter un appareil).</p>
               <img id="scan-qr-img" alt="QR WhatsApp" width="260" height="260" style="align-self:center;border-radius:12px;background:#fff">
             </div>
-            <label class="field" id="scan-group-field" hidden>
-              <span>Groupe surveillé</span>
-              <select id="scan-group" class="mono"></select>
-              <small class="muted" id="scan-group-hint">Laisse « Tous les groupes » si tu préfères ne pas filtrer.</small>
-            </label>
+            <div class="field" id="scan-group-field" hidden>
+              <span>Conversations surveillées <small class="muted">(groupes et privées)</small></span>
+              <ul id="scan-chat-list" class="course-list" style="max-height:240px;overflow:auto"></ul>
+              <small class="muted" id="scan-group-hint">Coche les conversations à surveiller. Rien de coché = tout est surveillé.</small>
+            </div>
             <div class="row">
-              <button type="button" class="btn ghost" id="scan-refresh" hidden>Rafraîchir les groupes</button>
+              <button type="button" class="btn ghost" id="scan-refresh" hidden>Rafraîchir les conversations</button>
               <button type="button" class="btn ghost" id="scan-reset" hidden>Changer de compte</button>
             </div>
           </article>
