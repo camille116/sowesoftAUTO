@@ -7,24 +7,29 @@ const normalize = (t) =>
   String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").toLowerCase();
 const includesAny = (text, list = []) => list.some((t) => normalize(text).includes(normalize(t)));
 
-/** Trace une signature manuscrite (boucles façon écriture cursive) qui occupe le cadre. */
+/**
+ * Trace le logo Claude (étoile à rayons rayonnant depuis le centre) dans le cadre de signature.
+ * Chaque rayon est un trait distinct ; l'ensemble remplit le cadre (large) pour que SoWeSoft
+ * accepte la signature (il refuse les signatures trop petites).
+ */
 export function signatureStrokes(width, height) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const rx = width * 0.44; // rayon horizontal : remplit le cadre large
+  const ry = height * 0.44; // rayon vertical
+  const inner = 0.12; // petit vide au centre, comme le logo Claude
+  const rays = 11; // le logo Claude compte 11 rayons
   const strokes = [];
-  const left = width * 0.1;
-  const span = width * 0.8;
-  const mid = height * 0.5;
-  const amp = height * 0.3;
-
-  const main = [];
-  for (let i = 0; i <= 120; i++) {
-    const t = i / 120;
-    const loops = Math.sin(t * Math.PI * 7);
-    main.push([left + t * span + Math.cos(t * Math.PI * 7) * width * 0.025, mid - loops * amp * (0.6 + 0.4 * Math.sin(t * Math.PI))]);
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2 - Math.PI / 2; // on démarre en haut
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    const x1 = cx + c * rx * inner;
+    const y1 = cy + s * ry * inner;
+    const x2 = cx + c * rx;
+    const y2 = cy + s * ry;
+    strokes.push([[x1, y1], [(x1 + x2) / 2, (y1 + y2) / 2], [x2, y2]]);
   }
-  strokes.push(main);
-
-  // trait de soulignement
-  strokes.push([[left + span * 0.05, mid + amp * 1.05], [left + span * 0.5, mid + amp * 0.95], [left + span * 0.95, mid + amp * 1.1]]);
   return strokes;
 }
 
@@ -132,6 +137,21 @@ export class SowesignSigner {
     }, selector, labels);
   }
 
+  /**
+   * Après l'ouverture du portail : attend soit le vrai formulaire de connexion (bouton « Continuer »
+   * ou champ e-mail), soit une redirection vers l'espace étudiant (session encore valable).
+   * Renvoie 'student' si on est déjà connecté, sinon 'form'.
+   */
+  async waitForLoginForm(page, timeout = 10000) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (page.url().includes('/student')) return 'student';
+      if ((await page.$(this.sel.continue)) || (await page.$(this.sel.email))) return 'form';
+      await sleep(300);
+    }
+    return 'form'; // on tente quand même le formulaire
+  }
+
   async login(page) {
     const { method, institution, id, pin, email, password } = this.auth;
     if (this.loginLocked) {
@@ -144,7 +164,13 @@ export class SowesignSigner {
     if (method === 'password' && !(email && password)) throw new Error('SOWESIGN_EMAIL / SOWESIGN_PASSWORD manquants dans .env');
 
     if (!page.url().includes('/login')) await page.goto(this.site.portalUrl, { waitUntil: 'networkidle2' });
-    const cont = await page.waitForSelector(this.sel.continue, { visible: true, timeout: 8000 }).catch(() => null);
+
+    // La session peut être encore valable : le portail redirige alors directement vers l'espace
+    // étudiant. Inutile (et impossible) de ressaisir les identifiants → on s'arrête là.
+    const form = await this.waitForLoginForm(page);
+    if (form === 'student') return;
+
+    const cont = await page.$(this.sel.continue);
     if (cont) await cont.click();
     await sleep(800);
     await page.keyboard.type(String(institution), { delay: 80 });
@@ -158,7 +184,11 @@ export class SowesignSigner {
     }
 
     if (method === 'password') {
-      const emailField = await page.waitForSelector(this.sel.email, { visible: true });
+      const emailField = await page.waitForSelector(this.sel.email, { visible: true, timeout: 10000 }).catch(() => null);
+      if (!emailField) {
+        if (page.url().includes('/student')) return; // session redevenue valable entre-temps
+        throw new Error('champ e-mail SoWeSoft introuvable (la page a peut-être changé — vérifie la capture)');
+      }
       await emailField.type(email, { delay: 30 });
       await (await page.$(this.sel.password)).type(password, { delay: 30 });
       await this.clickByText(page, 'app-button, button, div', this.texts.validate);
@@ -187,9 +217,12 @@ export class SowesignSigner {
   /** Ouvre l'espace étudiant (en se reconnectant si besoin) et renvoie l'état de la page. */
   async open(page) {
     await page.goto(this.site.studentUrl, { waitUntil: 'networkidle2' });
+    // La fenêtre « Informations légales » peut masquer la vraie page : on la ferme avant de décider.
+    await this.closePopups(page, 1200);
     let state = await this.waitForState(page);
     if (state === 'login' || state === 'accessDenied') {
       await this.login(page);
+      await this.closePopups(page, 1200);
       state = await this.waitForState(page, Object.keys(this.pages));
     }
     if (!state) throw new Error('page SoWeSoft non reconnue (vérifie la capture)');
