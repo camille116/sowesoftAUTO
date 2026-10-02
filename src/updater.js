@@ -23,16 +23,42 @@ export function createUpdater({ root, dataDir, repo, branch, managed, fetchImpl 
   const current = () => (existsSync(versionFile) ? readFileSync(versionFile, 'utf8').trim() || null : null);
   const canUpdate = () => Boolean(managed) && existsSync(script);
 
+  // SHA de la branche via l'endpoint git (pas l'API REST) : non soumis à la limite 60 requêtes/h
+  // qui provoquait les erreurs « GitHub HTTP 403 » quand on mettait à jour plusieurs fois.
+  async function fetchLatestSha() {
+    const res = await fetchImpl(`https://github.com/${repo}.git/info/refs?service=git-upload-pack`, {
+      headers: { 'user-agent': 'LinkeD-updater' },
+      signal: AbortSignal.timeout(15e3),
+    });
+    if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`);
+    const text = await res.text();
+    const esc = branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = text.match(new RegExp(`([0-9a-f]{40}) refs/heads/${esc}(?:\\0|\\n|$)`));
+    if (!m) throw new Error(`branche ${branch} introuvable sur GitHub`);
+    return m[1];
+  }
+
+  // message du dernier commit (confort) : via l'API REST, limitée à 60/h → on ignore ses erreurs
+  async function fetchMessage(sha) {
+    try {
+      const res = await fetchImpl(`https://api.github.com/repos/${repo}/commits/${sha}`, {
+        headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkeD-updater' },
+        signal: AbortSignal.timeout(10e3),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return String(data.commit?.message || '').split('\n')[0].slice(0, 120) || null;
+    } catch {
+      return null;
+    }
+  }
+
   async function latest(force = false) {
     if (!force && Date.now() - cache.at < CACHE_MS) return cache;
     try {
-      const res = await fetchImpl(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, {
-        headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkeD-updater' },
-        signal: AbortSignal.timeout(15e3),
-      });
-      if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`);
-      const data = await res.json();
-      cache = { at: Date.now(), latest: data.sha, message: String(data.commit?.message || '').split('\n')[0].slice(0, 120), error: null };
+      const sha = await fetchLatestSha();
+      const message = sha === cache.latest && cache.message ? cache.message : await fetchMessage(sha);
+      cache = { at: Date.now(), latest: sha, message, error: null };
     } catch (err) {
       cache = { ...cache, at: Date.now() - CACHE_MS + 60e3, error: err.message }; // nouvel essai dans 1 min
     }

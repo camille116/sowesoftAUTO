@@ -18,6 +18,12 @@ function setup({ managed = true, script = 'echo ok; echo "$2" > VERSION', fail =
   const calls = [];
   const fetchImpl = async (url) => {
     calls.push(url);
+    // endpoint git (info/refs) : liste des branches au format pkt-line
+    if (url.includes('/info/refs')) {
+      const refs = `001e# service=git-upload-pack\n0000${SHA_NEW} refs/heads/main\0report-status\n${SHA_OLD} refs/heads/autre\n`;
+      return { ok: true, text: async () => refs };
+    }
+    // API REST (message du commit, best-effort)
     return { ok: true, json: async () => ({ sha: SHA_NEW, commit: { message: 'Nouvelle interface LinkeD\n\ndétails' } }) };
   };
   let exited = null;
@@ -32,7 +38,7 @@ test('détecte une nouvelle version sur GitHub', async () => {
   assert.equal(info.latest, SHA_NEW);
   assert.equal(info.updateAvailable, true);
   assert.equal(info.latestMessage, 'Nouvelle interface LinkeD');
-  assert.match(calls[0], /api\.github\.com\/repos\/moi\/linked\/commits\/main/);
+  assert.match(calls[0], /github\.com\/moi\/linked\.git\/info\/refs/);
 });
 
 test('mise à jour : lance le script avec le bon commit puis redémarre', async () => {
