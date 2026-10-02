@@ -54,14 +54,17 @@ export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, c
       if (!cfg?.enabled) return;
       if (!message || message.type !== 'chat' || !message.body) return;
       const chat = await message.getChat();
-      if (!chat?.isGroup) return; // on ne lit QUE des groupes
-      const id = chat.id?._serialized || chat.id;
-      if (cfg.groupId && id !== cfg.groupId) return; // pas le groupe choisi
+      const id = chat?.id?._serialized || chat?.id;
+      // Si un groupe précis est choisi : on ne lit que celui-là.
+      // Sinon (« Tous les groupes ») : on lit tous les groupes ET les messages directs (pratique pour tester).
+      if (cfg.groupId) { if (id !== cfg.groupId) return; }
+      else if (!chat?.isGroup && !chat?.id) return;
       const code = extractCode(message.body);
       if (!code || recentlyTried(code)) return;
       tried.set(code, Date.now());
-      log.info(`WhatsApp scan : code ${code} repéré dans « ${chat.name} »`);
-      await onDetect(code, { group: chat.name });
+      const where = chat?.isGroup ? chat.name : 'message direct';
+      log.info(`WhatsApp scan : code ${code} repéré (${where})`);
+      await onDetect(code, { group: where });
     } catch (err) {
       log.warn(`WhatsApp scan : message ignoré (${err.message})`);
     }

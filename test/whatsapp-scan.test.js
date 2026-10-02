@@ -26,6 +26,7 @@ function scanner({ config } = {}) {
 const groupMsg = (body, { isGroup = true, id = 'G1', name = 'Classe M1' } = {}) => ({
   type: 'chat', body, getChat: async () => ({ isGroup, id: { _serialized: id }, name }),
 });
+const dmMsg = (body, { id = 'D1' } = {}) => ({ type: 'chat', body, getChat: async () => ({ isGroup: false, id: { _serialized: id }, name: 'Pote' }) });
 
 test('scan désactivé : ne signe pas', async () => {
   const { sc, calls } = scanner({ config: { enabled: false, groupId: 'G1' } });
@@ -33,15 +34,17 @@ test('scan désactivé : ne signe pas', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('message hors groupe : ignoré', async () => {
+test('sans filtre : message direct accepté (pratique pour tester)', async () => {
   const { sc, calls } = scanner({ config: { enabled: true, groupId: '' } });
-  await sc.handleMessage(groupMsg('48213', { isGroup: false }));
-  assert.equal(calls.length, 0);
+  await sc.handleMessage(dmMsg('48213'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].info.group, 'message direct');
 });
 
-test('mauvais groupe : ignoré', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'AUTRE' } });
-  await sc.handleMessage(groupMsg('48213', { id: 'G1' }));
+test('filtre groupe actif : un message direct ou un autre groupe est ignoré', async () => {
+  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' } });
+  await sc.handleMessage(groupMsg('48213', { id: 'AUTRE' }));
+  await sc.handleMessage(dmMsg('48213', { id: 'D1' }));
   assert.equal(calls.length, 0);
 });
 
