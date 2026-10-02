@@ -7,28 +7,82 @@ const normalize = (t) =>
   String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").toLowerCase();
 const includesAny = (text, list = []) => list.some((t) => normalize(text).includes(normalize(t)));
 
+// Le mascotte pixel-art Claude, décrit en coordonnées locales (largeur 1.0 × hauteur 0.68,
+// bras compris : ils donnent au sprite sa forme plus large que haute). y vers le bas.
+const SPRITE = {
+  width: 1.0,
+  height: 0.68,
+  // zones pleines (corps + bras qui dépassent sur les côtés)
+  fill: [
+    { x0: 0.16, y0: 0.0, x1: 0.84, y1: 0.54 }, // tête + corps
+    { x0: 0.0, y0: 0.25, x1: 1.0, y1: 0.38 }, // bras (pleine largeur)
+    { x0: 0.22, y0: 0.54, x1: 0.29, y1: 0.68 }, // patte
+    { x0: 0.35, y0: 0.54, x1: 0.42, y1: 0.68 }, // patte
+    { x0: 0.58, y0: 0.54, x1: 0.65, y1: 0.68 }, // patte
+    { x0: 0.71, y0: 0.54, x1: 0.78, y1: 0.68 }, // patte
+  ],
+  // yeux : rectangles vides à réserver dans la zone pleine
+  holes: [
+    { x0: 0.29, y0: 0.11, x1: 0.38, y1: 0.24 },
+    { x0: 0.62, y0: 0.11, x1: 0.71, y1: 0.24 },
+  ],
+};
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/** Enlève le segment [a,b] de la liste d'intervalles (pour creuser les yeux). */
+function cutInterval(intervals, a, b) {
+  const out = [];
+  for (const [s, e] of intervals) {
+    if (b <= s || a >= e) { out.push([s, e]); continue; } // aucun recouvrement
+    if (a > s) out.push([s, a]);
+    if (b < e) out.push([b, e]);
+  }
+  return out;
+}
+
+/** Fusionne les intervalles qui se chevauchent. */
+function mergeIntervals(list) {
+  const sorted = [...list].sort((p, q) => p[0] - q[0]);
+  const out = [];
+  for (const [s, e] of sorted) {
+    const last = out.at(-1);
+    if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else out.push([s, e]);
+  }
+  return out;
+}
+
 /**
- * Trace le logo Claude (étoile à rayons rayonnant depuis le centre) dans le cadre de signature.
- * Chaque rayon est un trait distinct ; l'ensemble remplit le cadre (large) pour que SoWeSoft
- * accepte la signature (il refuse les signatures trop petites).
+ * Trace le mascotte pixel-art Claude dans le cadre de signature : on balaie des traits
+ * horizontaux pour « remplir » les zones pleines (corps, bras, pattes) en réservant les yeux.
+ * Le sprite garde ses proportions et est centré ; les bras pleine largeur lui font occuper
+ * tout le cadre, ce qui évite que SoWeSoft refuse une signature trop petite.
  */
 export function signatureStrokes(width, height) {
-  const cx = width / 2;
-  const cy = height / 2;
-  const rx = width * 0.44; // rayon horizontal : remplit le cadre large
-  const ry = height * 0.44; // rayon vertical
-  const inner = 0.12; // petit vide au centre, comme le logo Claude
-  const rays = 11; // le logo Claude compte 11 rayons
+  // échelle uniforme pour que le sprite tienne dans le cadre (ses proportions sont conservées)
+  const scale = Math.min(width / SPRITE.width, height / SPRITE.height);
+  const spriteW = SPRITE.width * scale;
+  const spriteH = SPRITE.height * scale;
+  const offX = (width - spriteW) / 2;
+  const offY = (height - spriteH) / 2;
+  const X = (sx) => offX + sx * scale;
+  const Y = (sy) => offY + sy * scale;
+
+  const lines = clamp(Math.round(spriteH / 5), 18, 42); // un trait tous les ~5 px (assez dense, pas trop long à tracer)
   const strokes = [];
-  for (let i = 0; i < rays; i++) {
-    const a = (i / rays) * Math.PI * 2 - Math.PI / 2; // on démarre en haut
-    const c = Math.cos(a);
-    const s = Math.sin(a);
-    const x1 = cx + c * rx * inner;
-    const y1 = cy + s * ry * inner;
-    const x2 = cx + c * rx;
-    const y2 = cy + s * ry;
-    strokes.push([[x1, y1], [(x1 + x2) / 2, (y1 + y2) / 2], [x2, y2]]);
+  for (let i = 0; i <= lines; i++) {
+    const sy = (i / lines) * SPRITE.height;
+    let spans = SPRITE.fill.filter((r) => sy >= r.y0 && sy < r.y1).map((r) => [r.x0, r.x1]);
+    if (!spans.length) continue;
+    spans = mergeIntervals(spans);
+    for (const hole of SPRITE.holes) {
+      if (sy >= hole.y0 && sy < hole.y1) spans = cutInterval(spans, hole.x0, hole.x1);
+    }
+    for (const [a, b] of spans) {
+      if (b - a < 0.01) continue;
+      strokes.push([[X(a), Y(sy)], [X((a + b) / 2), Y(sy)], [X(b), Y(sy)]]);
+    }
   }
   return strokes;
 }
@@ -278,7 +332,7 @@ export class SowesignSigner {
 
   /** Après la saisie du code : attend la suite (pad de signature, validation, erreur). */
   async finish(page) {
-    const deadline = Date.now() + this.timeout;
+    let deadline = Date.now() + this.timeout;
     let signed = false;
     while (Date.now() < deadline) {
       const text = await this.bodyText(page);
@@ -291,6 +345,7 @@ export class SowesignSigner {
       if (!signed && (await page.$(this.pages.signature))) {
         await this.drawSignature(page);
         signed = true;
+        deadline = Date.now() + this.timeout; // le tracé du logo est long : on relance le délai pour la confirmation
       }
       const toast = await page.$eval(this.sel.toast, (e) => e.innerText.trim()).catch(() => '');
       if (toast && /erreur|error/i.test(toast)) return { ok: false, reason: toast.replace(/\s+/g, ' ') };
