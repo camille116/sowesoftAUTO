@@ -85,6 +85,15 @@ export class Settings {
       next.telegramToken = t;
     }
 
+    if (patch.signature) {
+      const sg = patch.signature;
+      const style = sg.style ?? next.signature?.style ?? 'claude';
+      if (!['claude', 'name', 'psg'].includes(style)) throw new Error('Style de signature inconnu');
+      let name = 'name' in sg ? String(sg.name || '').trim() : next.signature?.name || '';
+      if (name.length > 40) throw new Error('Nom de signature trop long (40 caractères max)');
+      next.signature = { style, name: name || 'Camille Redon' };
+    }
+
     if (patch.auth) {
       const a = patch.auth;
       if ('method' in a) {

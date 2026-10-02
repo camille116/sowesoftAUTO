@@ -103,6 +103,7 @@ export class Bot {
       }
       case 'pause': this.setPaused(true); return this.send(msg.paused());
       case 'resume': this.setPaused(false); return this.send(msg.resumed());
+      case 'signature': return this.changeSignature(cmd.style);
       case 'test': return this.test();
       default: return this.send(msg.unknown());
     }
@@ -164,6 +165,15 @@ export class Bot {
       await this.send(result.already ? msg.alreadySigned(current) : msg.signed(current), result.screenshot);
     }
     return { ...result, session: current };
+  }
+
+  /** Change le style de signature tracée (commande « signature … »). */
+  async changeSignature(style) {
+    const current = this.readSignature?.() || { style: 'claude' };
+    if (!style) return this.send(msg.signatureMenu(current.style));
+    const sig = this.setSignatureStyle ? this.setSignatureStyle(style) : { ...current, style };
+    this.store.log('signature-style', { title: sig.style });
+    return this.send(msg.signatureSet(sig));
   }
 
   async status(now) {

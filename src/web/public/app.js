@@ -509,7 +509,33 @@ async function loadSettings() {
   rsec.value = '';
   rsec.placeholder = s.hasRelaySecret ? '•••••• (inchangée)' : 'Clé affichée par le script';
   setMethod(s.auth.method);
+  setSignature(s.signature || { style: 'claude', name: 'Camille Redon' });
 }
+
+// ── Style de signature ────────────────────────────────────
+let signatureStyle = 'claude';
+function setSignature(sig) {
+  signatureStyle = sig.style || 'claude';
+  $$('#signature-style button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.style === signatureStyle)));
+  const nameField = $('[data-for="signature-name"]');
+  if (nameField) nameField.hidden = signatureStyle !== 'name';
+  const nameInput = $('#signature-card [name=signatureName]');
+  if (nameInput && document.activeElement !== nameInput) nameInput.value = sig.name || '';
+}
+async function saveSignature(patch) {
+  try {
+    const s = await api('/api/settings', { signature: { style: signatureStyle, ...patch } });
+    setSignature(s.signature);
+    toast('Signature enregistrée');
+  } catch (err) { toast(err.message); }
+}
+$('#signature-style')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.dataset.style === signatureStyle) return;
+  signatureStyle = b.dataset.style;
+  saveSignature(b.dataset.style === 'name' ? { name: $('#signature-card [name=signatureName]').value || 'Camille Redon' } : {});
+});
+$('#signature-card [name=signatureName]')?.addEventListener('change', (e) => saveSignature({ name: e.target.value }));
 
 $('#settings-form').addEventListener('submit', async (e) => {
   e.preventDefault();

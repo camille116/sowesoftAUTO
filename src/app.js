@@ -26,6 +26,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     memberTemplate: DEFAULT_MEMBER_TEMPLATE,
     relayUrl: '', relaySecret: '',
     telegramToken: config.telegram?.token || '',
+    signature: { style: 'claude', name: 'Camille Redon' },
   });
   const s = settings.get();
 
@@ -36,6 +37,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     dryRun: s.dryRun,
     browser: config.browser,
     dataDir: config.dataDir,
+    signature: s.signature,
   });
 
   const members = new Members(config.dataDir);
@@ -64,12 +66,17 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     bot.offsets = v.reminderOffsets;
     bot.dryRun = signer.dryRun = v.dryRun;
     signer.auth = v.auth;
+    signer.signature = v.signature;
     signer.loginLocked = null; // nouveaux identifiants : on autorise un nouvel essai
     store.log('settings');
     if (v.channel !== before.channel || v.telegramToken !== before.telegramToken || v.whatsappNumber !== before.whatsappNumber
         || v.relayUrl !== before.relayUrl || v.relaySecret !== before.relaySecret) app.onChannelSettings?.(v);
     return settings.public();
   }
+
+  // la commande « signature » du bot lit / change le style via les réglages
+  bot.readSignature = () => settings.get().signature;
+  bot.setSignatureStyle = (style) => updateSettings({ signature: { style } }).signature;
 
   const app = { store, settings, planning, signer, bot, channel, members, updateSettings, onChannelSettings: null };
   return app;

@@ -104,6 +104,7 @@ export function relayHandle({ update, snapshot, overrides = {}, coursesToday = [
       case 'pause': next.paused = true; reply(chatId, '⏸️ Rappels en pause. Tape *reprendre* pour les relancer.'); break;
       case 'resume': next.paused = false; reply(chatId, '▶️ C’est reparti.'); break;
       case 'status': { const c = currentOf(signToday, now); reply(chatId, `*Statut* (via le cloud)\nRappels : ${(next.paused ?? paused) ? '⏸️ en pause' : '▶️ actifs'}\nEn cours : ${c ? `${c.subject || c.title} ${isDone(c.id) ? '✅' : '⬜ à signer'}` : '—'}`); break; }
+      case 'signature': reply(chatId, '✍️ Le choix de la signature se règle quand ton Mac est allumé (renvoie *signature* à ce moment-là, ou va dans l’app LinkeD → Réglages).'); break;
       case 'help': reply(chatId, 'Je réponds même Mac éteint :\n• *planning* / *demain* : tes cours (salle, campus)\n• *fait* : tu as signé\n• *pause* / *reprendre*\n• un *code* à 5 chiffres : je signe si ton Mac est allumé'); break;
       default: reply(chatId, 'Je n’ai pas compris 🤔 Tape *aide*, *planning*, *demain*, ou envoie un *code*.');
     }

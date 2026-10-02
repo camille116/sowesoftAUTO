@@ -28,9 +28,24 @@ function clean(text) {
     .trim();
 }
 
+const SIGN_STYLES = [
+  { style: 'claude', words: ['claude', 'robot', 'logo', 'mascotte'] },
+  { style: 'name', words: ['nom', 'name', 'camille', 'redon', 'prenom', 'prénom', 'manuscrit', 'manuscrite'] },
+  { style: 'psg', words: ['psg', 'paris', 'foot', 'eiffel'] },
+];
+
 export function parseCommand(raw) {
   const text = clean(raw);
   if (!text) return { type: 'unknown' };
+
+  // « signature », « signature psg », « signature nom »… : choisir le style de signature tracée
+  const sig = text.match(/^signatures?(?:\s+(.*))?$/);
+  if (sig) {
+    const arg = (sig[1] || '').trim();
+    if (!arg) return { type: 'signature' };
+    const found = SIGN_STYLES.find((s) => s.words.some((w) => arg.includes(w)));
+    return { type: 'signature', style: found ? found.style : null };
+  }
 
   // « code 48213 », « signe 48213 », « signer : 48213 », « sign 48213 »
   const withPrefix = text.match(/^(?:code|signe|signer|sign|emarge|émarge)\s*[:=-]?\s*([a-z0-9 ]{3,12})$/i);

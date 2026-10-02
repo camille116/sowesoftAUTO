@@ -312,6 +312,23 @@
             </form>
           </article>
 
+          <!-- Style de la signature tracée -->
+          <article class="card stack" id="signature-card">
+            <div class="section-head">
+              <h3>Ta signature</h3>
+              <p class="muted small">Le dessin tracé sur SoWeSoft quand LinkeD signe. (Aussi via le bot : <code>signature</code>.)</p>
+            </div>
+            <div class="segmented segmented-full" id="signature-style" role="radiogroup" aria-label="Style de signature">
+              <button type="button" role="radio" data-style="claude">Robot Claude</button>
+              <button type="button" role="radio" data-style="name">Nom manuscrit</button>
+              <button type="button" role="radio" data-style="psg">Logo PSG</button>
+            </div>
+            <label class="field" data-for="signature-name">
+              <span>Nom à signer</span>
+              <input name="signatureName" maxlength="40" placeholder="Camille Redon">
+            </label>
+          </article>
+
           <!-- SoWeSoft + agenda -->
           <form id="settings-form" class="card stack">
             <div class="section-head">

@@ -24,6 +24,14 @@ test('mots-clés', () => {
   assert.equal(parseCommand('aide').type, 'help');
 });
 
+test('commande signature : menu et choix du style', () => {
+  assert.deepEqual(parseCommand('signature'), { type: 'signature' });
+  assert.deepEqual(parseCommand('signature psg'), { type: 'signature', style: 'psg' });
+  assert.deepEqual(parseCommand('signature robot'), { type: 'signature', style: 'claude' });
+  assert.deepEqual(parseCommand('signature nom'), { type: 'signature', style: 'name' });
+  assert.deepEqual(parseCommand('signature bidule'), { type: 'signature', style: null });
+});
+
 test('le reste est inconnu', () => {
   assert.equal(parseCommand('salut ça va ?').type, 'unknown');
   assert.equal(parseCommand('').type, 'unknown');

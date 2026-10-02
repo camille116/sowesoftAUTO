@@ -33,6 +33,18 @@ test('la signature dessinée occupe le cadre', () => {
   assert.ok(Math.max(...xs) - Math.min(...xs) > 400 * 0.7);
 });
 
+test('chaque style de signature remplit le cadre sans déborder', () => {
+  for (const opts of ['claude', 'psg', { style: 'name', name: 'Camille Redon' }]) {
+    const pts = signatureStrokes(360, 200, opts).flat();
+    assert.ok(pts.length > 10, `trop peu de points pour ${JSON.stringify(opts)}`);
+    const xs = pts.map(([x]) => x);
+    const ys = pts.map(([, y]) => y);
+    assert.ok(Math.max(...xs) - Math.min(...xs) > 360 * 0.5, 'assez large (SoWeSoft refuse les petites signatures)');
+    assert.ok(Math.min(...xs) >= -1 && Math.max(...xs) <= 361, 'reste dans le cadre en X');
+    assert.ok(Math.min(...ys) >= -1 && Math.max(...ys) <= 201, 'reste dans le cadre en Y');
+  }
+});
+
 test('se connecte, ferme la popup, tape le code, dessine la signature', { skip }, async () => {
   const result = await signer().sign('48213');
   assert.equal(result.ok, true, result.reason);

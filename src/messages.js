@@ -9,6 +9,9 @@ const fmtDay = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'num
 
 export const BOT_TAG = '🤖';
 
+/** Libellés lisibles des styles de signature. */
+export const SIGNATURE_LABELS = { claude: 'Robot Claude', name: 'Nom manuscrit', psg: 'Logo PSG' };
+
 /** Message de rappel envoyé aux membres de la classe (modifiable dans l'app → Classe). */
 export const DEFAULT_MEMBER_TEMPLATE =
   '⏰ {prenom}, pense à signer sur SoWeSoft !\n📚 {cours} · {debut}–{fin}\n\nRéponds *fait* quand c\'est signé.';
@@ -78,6 +81,7 @@ export const msg = {
     `• *planning* / *demain* / *semaine* → tes créneaux d'autonomie\n` +
     `• *statut* → où on en est\n` +
     `• *pause* / *reprendre* → couper / relancer les rappels\n` +
+    `• *signature* → choisir le dessin de ta signature (robot, nom, PSG)\n` +
     `• *test* → je vérifie la connexion à SoWeSoft (et je la débloque après une erreur)` +
     (dryRun ? `\n\n🧪 _Mode test actif : je remplis le code mais je ne valide pas._` : ''),
 
@@ -98,6 +102,15 @@ export const msg = {
   signFailed: (reason) =>
     `${BOT_TAG} ❌ Je n'ai pas réussi à signer : ${reason}\n👉 Signe à la main sur l'appli, puis réponds *fait*. Tu peux aussi me renvoyer le code.`,
   signBusy: () => `${BOT_TAG} ⏳ Je suis déjà en train de signer, une seconde…`,
+
+  signatureMenu: (current) =>
+    `${BOT_TAG} ✍️ *Ta signature* (actuelle : ${SIGNATURE_LABELS[current] || current})\n` +
+    `Choisis le dessin tracé sur SoWeSoft :\n` +
+    `• *signature robot* → le petit personnage Claude\n` +
+    `• *signature nom* → « Camille Redon » manuscrit\n` +
+    `• *signature psg* → le logo du PSG`,
+  signatureSet: ({ style, name } = {}) =>
+    `${BOT_TAG} ✅ Signature réglée sur *${SIGNATURE_LABELS[style] || style}*${style === 'name' && name ? ` (${name})` : ''}.\nElle sera utilisée à la prochaine signature.`,
 
   markedDone: (session) => `${BOT_TAG} 👍 Noté, plus de rappel pour ${session ? slot(session) : 'ce créneau'}.`,
   skipped: (session) => `${BOT_TAG} 🙈 Ok, j'ignore ${slot(session)}.`,

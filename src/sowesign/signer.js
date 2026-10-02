@@ -53,38 +53,153 @@ function mergeIntervals(list) {
   return out;
 }
 
-/**
- * Trace le mascotte pixel-art Claude dans le cadre de signature : on balaie des traits
- * horizontaux pour « remplir » les zones pleines (corps, bras, pattes) en réservant les yeux.
- * Le sprite garde ses proportions et est centré ; les bras pleine largeur lui font occuper
- * tout le cadre, ce qui évite que SoWeSoft refuse une signature trop petite.
- */
-export function signatureStrokes(width, height) {
-  // échelle uniforme pour que le sprite tienne dans le cadre (ses proportions sont conservées)
-  const scale = Math.min(width / SPRITE.width, height / SPRITE.height);
-  const spriteW = SPRITE.width * scale;
-  const spriteH = SPRITE.height * scale;
-  const offX = (width - spriteW) / 2;
-  const offY = (height - spriteH) / 2;
-  const X = (sx) => offX + sx * scale;
-  const Y = (sy) => offY + sy * scale;
-
-  const lines = clamp(Math.round(spriteH / 5), 18, 42); // un trait tous les ~5 px (assez dense, pas trop long à tracer)
+// Remplit une forme décrite par une fonction spans(sy)→intervalles [x0,x1] (unités 0..1), en
+// balayant des traits horizontaux (comme le mascotte Claude) : rapide à tracer sur le pad.
+function fillByScan(width, height, shape, linePx = 5) {
+  const scale = Math.min(width / shape.width, height / shape.height); // proportions conservées
+  const sw = shape.width * scale;
+  const sh = shape.height * scale;
+  const offX = (width - sw) / 2;
+  const offY = (height - sh) / 2;
+  const lines = clamp(Math.round(sh / linePx), 18, 60);
   const strokes = [];
   for (let i = 0; i <= lines; i++) {
-    const sy = (i / lines) * SPRITE.height;
-    let spans = SPRITE.fill.filter((r) => sy >= r.y0 && sy < r.y1).map((r) => [r.x0, r.x1]);
-    if (!spans.length) continue;
-    spans = mergeIntervals(spans);
-    for (const hole of SPRITE.holes) {
-      if (sy >= hole.y0 && sy < hole.y1) spans = cutInterval(spans, hole.x0, hole.x1);
-    }
-    for (const [a, b] of spans) {
+    const sy = (i / lines) * shape.height;
+    const Y = offY + sy * scale;
+    for (const [a, b] of shape.spans(sy)) {
       if (b - a < 0.01) continue;
-      strokes.push([[X(a), Y(sy)], [X((a + b) / 2), Y(sy)], [X(b), Y(sy)]]);
+      const xa = offX + a * scale;
+      const xb = offX + b * scale;
+      strokes.push([[xa, Y], [(xa + xb) / 2, Y], [xb, Y]]);
     }
   }
   return strokes;
+}
+
+// Écusson PSG stylisé (anneau + Tour Eiffel + socle), rempli par balayage.
+const discHalf = (cx, r, dy) => {
+  if (Math.abs(dy) >= r) return null;
+  const h = Math.sqrt(r * r - dy * dy);
+  return [cx - h, cx + h];
+};
+const PSG = {
+  width: 1,
+  height: 1,
+  spans(sy) {
+    const cx = 0.5;
+    const dy = sy - 0.5;
+    let spans = [];
+    const outer = discHalf(cx, 0.48, dy); // anneau
+    if (outer) {
+      const inner = discHalf(cx, 0.4, dy);
+      if (inner) { spans.push([outer[0], inner[0]]); spans.push([inner[1], outer[1]]); }
+      else spans.push(outer);
+    }
+    const yt = 0.2;
+    const yb = 0.74;
+    if (sy >= yt && sy <= yb) { // Tour Eiffel
+      const t = (sy - yt) / (yb - yt);
+      let half = 0.015 + 0.17 * Math.pow(t, 1.8); // évasement concave
+      if (Math.abs(sy - 0.41) < 0.02) half = Math.max(half, 0.1); // 1re plateforme
+      if (Math.abs(sy - 0.6) < 0.02) half = Math.max(half, 0.14); // 2e plateforme
+      spans.push([cx - half, cx + half]);
+      if (sy > 0.62) { // jambes : on évide le centre sous la 2e plateforme
+        const gap = half * 0.4;
+        spans = cutInterval(mergeIntervals(spans), cx - gap, cx + gap);
+      }
+    }
+    if (sy >= 0.74 && sy < 0.8) spans.push([0.3, 0.7]); // socle
+    return mergeIntervals(spans);
+  },
+};
+
+// Mascotte pixel-art Claude : zones pleines (corps, bras, pattes) en réservant les yeux.
+const CLAUDE_SHAPE = {
+  width: SPRITE.width,
+  height: SPRITE.height,
+  spans(sy) {
+    let spans = mergeIntervals(SPRITE.fill.filter((r) => sy >= r.y0 && sy < r.y1).map((r) => [r.x0, r.x1]));
+    if (!spans.length) return spans;
+    for (const hole of SPRITE.holes) {
+      if (sy >= hole.y0 && sy < hole.y1) spans = cutInterval(spans, hole.x0, hole.x1);
+    }
+    return spans;
+  },
+};
+const claudeStrokes = (width, height) => fillByScan(width, height, CLAUDE_SHAPE);
+const psgStrokes = (width, height) => fillByScan(width, height, PSG);
+
+// ── Police manuscrite minimale ───────────────────────────────────────────────
+// Chaque glyphe est décrit dans une cellule x∈[0,w] (w = chasse), y∈[0,1] (0 = haut, 1 = bas),
+// avec la ligne de base vers 0.8. Un glyphe = liste de traits (polylignes). Assez pour écrire un nom.
+const deg = (d) => (d * Math.PI) / 180;
+function arc(cx, cy, rx, ry, a0, a1, n = 20) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = deg(a0 + ((a1 - a0) * i) / n);
+    pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+  }
+  return pts;
+}
+// y : captop 0.18 · asctop 0.14 · xtop 0.45 · baseline 0.80 ; cercle bas-de-casse centré (0.?,0.625) ry0.175
+const GLYPHS = {
+  ' ': { w: 0.4, strokes: [] },
+  C: { w: 0.78, strokes: [arc(0.5, 0.49, 0.34, 0.31, 60, 300, 26)] },
+  R: { w: 0.74, strokes: [
+    [[0.14, 0.8], [0.14, 0.18]],
+    [[0.14, 0.18], [0.44, 0.18], [0.56, 0.3], [0.44, 0.49], [0.14, 0.49]],
+    [[0.32, 0.49], [0.6, 0.8]],
+  ] },
+  a: { w: 0.82, strokes: [arc(0.42, 0.625, 0.26, 0.18, 0, 360, 26), [[0.68, 0.45], [0.68, 0.8]]] },
+  d: { w: 0.84, strokes: [arc(0.4, 0.625, 0.26, 0.18, 0, 360, 26), [[0.66, 0.14], [0.66, 0.8]]] },
+  o: { w: 0.8, strokes: [arc(0.42, 0.625, 0.27, 0.18, 0, 360, 26)] },
+  e: { w: 0.76, strokes: [[[0.18, 0.63], [0.66, 0.63]], arc(0.42, 0.625, 0.26, 0.18, 0, 290, 24)] },
+  m: { w: 0.92, strokes: [
+    [[0.12, 0.8], [0.12, 0.46]],
+    [[0.12, 0.5], [0.2, 0.46], [0.3, 0.46], [0.38, 0.5], [0.38, 0.8]],
+    [[0.38, 0.5], [0.46, 0.46], [0.56, 0.46], [0.64, 0.5], [0.64, 0.8]],
+  ] },
+  n: { w: 0.62, strokes: [
+    [[0.12, 0.8], [0.12, 0.46]],
+    [[0.12, 0.5], [0.2, 0.46], [0.34, 0.46], [0.44, 0.5], [0.44, 0.8]],
+  ] },
+  i: { w: 0.26, strokes: [[[0.12, 0.45], [0.12, 0.8]], [[0.12, 0.3], [0.12, 0.34]]] },
+  l: { w: 0.26, strokes: [[[0.13, 0.14], [0.13, 0.8]]] },
+};
+
+// Trace un nom « à la main » : on pose les glyphes côte à côte, puis on met le mot à l'échelle
+// pour qu'il remplisse le cadre (SoWeSoft refuse une signature trop petite).
+function nameStrokes(width, height, text) {
+  const spacing = 0.07; // espace entre lettres (en unités de cellule)
+  const glyphs = [...String(text)].map((ch) => GLYPHS[ch] || GLYPHS[ch.toLowerCase()] || GLYPHS[' ']);
+  const totalW = glyphs.reduce((s, g) => s + g.w + spacing, 0) - spacing;
+  if (totalW <= 0) return claudeStrokes(width, height);
+
+  const scale = Math.min((width * 0.92) / totalW, height * 0.6); // hauteur de bande = 0.6 (1 unité = scale px)
+  const wordW = totalW * scale;
+  const offX = (width - wordW) / 2;
+  const offY = (height - scale) / 2;
+
+  const strokes = [];
+  let cursor = 0;
+  for (const g of glyphs) {
+    for (const stroke of g.strokes) {
+      strokes.push(stroke.map(([x, y]) => [offX + (cursor + x) * scale, offY + y * scale]));
+    }
+    cursor += g.w + spacing;
+  }
+  return strokes;
+}
+
+/**
+ * Trace la signature dans le cadre. `opts` : 'claude' (mascotte) par défaut, ou
+ * { style: 'name', name: 'Camille Redon' } pour une signature manuscrite du nom.
+ */
+export function signatureStrokes(width, height, opts = 'claude') {
+  const style = typeof opts === 'string' ? opts : opts?.style || 'claude';
+  if (style === 'name') return nameStrokes(width, height, (typeof opts === 'object' && opts?.name) || 'Camille Redon');
+  if (style === 'psg') return psgStrokes(width, height);
+  return claudeStrokes(width, height);
 }
 
 /**
@@ -98,12 +213,13 @@ export function signatureStrokes(width, height) {
  * on ne se reconnecte que si elle a expiré.
  */
 export class SowesignSigner {
-  constructor({ site, auth, dryRun, browser, dataDir }) {
+  constructor({ site, auth, dryRun, browser, dataDir, signature }) {
     this.site = site;
     this.sel = site.selectors;
     this.pages = site.pages;
     this.texts = site.texts;
     this.auth = auth; // { method: 'code'|'password'|'sso', institution, id, pin, email, password }
+    this.signature = signature || { style: 'claude', name: 'Camille Redon' }; // style de signature tracée
     this.dryRun = dryRun;
     this.browserOpts = browser;
     this.profileDir = join(dataDir, 'sowesign-profile');
@@ -352,7 +468,7 @@ export class SowesignSigner {
     const canvas = await page.waitForSelector(this.sel.signatureCanvas, { visible: true });
     const box = await canvas.boundingBox();
     if (!box) throw new Error('canevas de signature masqué (une fenêtre est peut-être ouverte par-dessus)');
-    for (const stroke of signatureStrokes(box.width, box.height)) {
+    for (const stroke of signatureStrokes(box.width, box.height, this.signature)) {
       await page.mouse.move(box.x + stroke[0][0], box.y + stroke[0][1]);
       await page.mouse.down();
       for (const [x, y] of stroke.slice(1)) await page.mouse.move(box.x + x, box.y + y, { steps: 2 });
