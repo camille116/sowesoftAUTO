@@ -7,6 +7,7 @@ import { log } from './logger.js';
 const { Client, LocalAuth } = pkg;
 
 const TRIED_TTL_MS = 10 * 60e3; // on ne retente pas le même code pendant 10 min
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Repère un code SoWeSoft (5 chiffres isolés) dans un message libre.
@@ -122,8 +123,15 @@ export function createWhatsAppScanner({ dataDir, browser, onCode, shouldSign, ge
   /** Liste les groupes WhatsApp du compte (pour choisir lequel surveiller). */
   async function listGroups() {
     if (!client || state.status !== 'ready') return [];
-    const chats = await client.getChats().catch(() => []);
-    return chats.filter((c) => c.isGroup).map((c) => ({ id: c.id?._serialized || String(c.id), name: c.name || '(sans nom)' }));
+    // WhatsApp charge les conversations en différé : on réessaie quelques fois.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const chats = await client.getChats().catch((e) => { log.warn(`WhatsApp scan : liste des groupes impossible (${e.message})`); return []; });
+      const groups = chats.filter((c) => c.isGroup).map((c) => ({ id: c.id?._serialized || String(c.id), name: c.name || c.formattedTitle || '(sans nom)' }));
+      if (groups.length) { log.info(`WhatsApp scan : ${groups.length} groupe(s) visible(s)`); return groups; }
+      if (attempt < 2) await sleep(1500);
+    }
+    log.info('WhatsApp scan : aucun groupe visible pour le moment (chats pas encore synchronisés ?)');
+    return [];
   }
 
   /** Applique la config : démarre/arrête selon « enabled ». */
