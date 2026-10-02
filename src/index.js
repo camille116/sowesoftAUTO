@@ -6,6 +6,7 @@ import { createWebServer } from './web/server.js';
 import { createUpdater } from './updater.js';
 import { createDesktop } from './desktop.js';
 import { createRelayClient } from './relay-client.js';
+import { createWhatsAppScanner } from './whatsapp-scan.js';
 import { msg } from './messages.js';
 import { log } from './logger.js';
 
@@ -87,6 +88,23 @@ app.channel.send = (...args) => channels.active.send(...args);
 app.onChannelSettings = (s) => applyChannel(s).catch((e) => log.error(e));
 applyChannel(app.settings.get()).catch((e) => log.error(e));
 relay.start();
+
+// ── Scan WhatsApp (lecture seule) ────────────────────────────
+// Surveille un groupe WhatsApp ; dès qu'un camarade poste un code SoWeSoft ET qu'il y a un cours
+// à signer en ce moment, on signe. N'envoie JAMAIS de message WhatsApp ; les retours vont sur Telegram.
+const scanner = createWhatsAppScanner({
+  dataDir: config.dataDir,
+  browser: config.browser,
+  getConfig: () => app.settings.get().whatsappScan,
+  shouldSign: () => app.signableNow(),
+  onCode: async (code, { group } = {}) => {
+    await app.channel.send(msg.scanDetected(code, group)).catch((e) => log.error(e));
+    await app.bot.handle(code); // signe + prévient du résultat sur Telegram
+  },
+});
+app.scanner = scanner;
+app.onScanSettings = () => scanner.apply();
+scanner.apply(); // démarre seulement si activé dans les réglages
 
 // ── Rappels ─────────────────────────────────────────────────
 const loop = () => app.bot.tick().catch((e) => log.error('Erreur tick :', e));

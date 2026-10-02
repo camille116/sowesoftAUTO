@@ -85,6 +85,16 @@ export class Settings {
       next.telegramToken = t;
     }
 
+    if (patch.whatsappScan) {
+      const w = patch.whatsappScan;
+      const cur = next.whatsappScan || { enabled: false, groupId: '', groupName: '' };
+      next.whatsappScan = {
+        enabled: 'enabled' in w ? Boolean(w.enabled) : cur.enabled,
+        groupId: 'groupId' in w ? String(w.groupId || '').trim() : cur.groupId,
+        groupName: 'groupName' in w ? String(w.groupName || '').trim().slice(0, 80) : cur.groupName,
+      };
+    }
+
     if (patch.signature) {
       const sg = patch.signature;
       const style = sg.style ?? next.signature?.style ?? 'claude';

@@ -329,6 +329,32 @@
             </label>
           </article>
 
+          <!-- Scan WhatsApp (lecture seule) -->
+          <article class="card stack" id="scan-card">
+            <div class="section-head">
+              <h3>Scan WhatsApp <span class="pill warn">lecture seule</span></h3>
+              <p class="muted small">Surveille un groupe ; dès qu'un camarade poste un code pendant un cours, LinkeD signe. N'envoie <b>jamais</b> de message WhatsApp. À utiliser avec un <b>compte secondaire</b> (méthode non officielle, risque faible mais non nul).</p>
+            </div>
+            <label class="switch-row">
+              <input type="checkbox" id="scan-enabled">
+              <span>Activer le scan WhatsApp</span>
+            </label>
+            <div id="scan-status" class="result" hidden></div>
+            <div id="scan-qr" class="stack" hidden>
+              <p class="muted small">Scanne ce QR depuis le téléphone du compte à surveiller (WhatsApp → Appareils connectés → Connecter un appareil).</p>
+              <img id="scan-qr-img" alt="QR WhatsApp" width="260" height="260" style="align-self:center;border-radius:12px;background:#fff">
+            </div>
+            <label class="field" id="scan-group-field" hidden>
+              <span>Groupe surveillé</span>
+              <select id="scan-group" class="mono"></select>
+              <small class="muted">Laisse « Tous les groupes » si tu préfères ne pas filtrer.</small>
+            </label>
+            <div class="row">
+              <button type="button" class="btn ghost" id="scan-refresh" hidden>Rafraîchir les groupes</button>
+              <button type="button" class="btn ghost" id="scan-reset" hidden>Changer de compte</button>
+            </div>
+          </article>
+
           <!-- SoWeSoft + agenda -->
           <form id="settings-form" class="card stack">
             <div class="section-head">

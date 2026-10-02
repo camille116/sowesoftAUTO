@@ -510,6 +510,7 @@ async function loadSettings() {
   rsec.placeholder = s.hasRelaySecret ? '•••••• (inchangée)' : 'Clé affichée par le script';
   setMethod(s.auth.method);
   setSignature(s.signature || { style: 'claude', name: 'Camille Redon' });
+  loadScan();
 }
 
 // ── Style de signature ────────────────────────────────────
@@ -536,6 +537,60 @@ $('#signature-style')?.addEventListener('click', (e) => {
   saveSignature(b.dataset.style === 'name' ? { name: $('#signature-card [name=signatureName]').value || 'Camille Redon' } : {});
 });
 $('#signature-card [name=signatureName]')?.addEventListener('change', (e) => saveSignature({ name: e.target.value }));
+
+// ── Scan WhatsApp (lecture seule) ─────────────────────────
+let scanTimer = null;
+const SCAN_LABEL = { off: '', starting: '⏳ Démarrage…', qr: '📷 Scanne le QR ci-dessous', syncing: '🔄 Synchronisation…', ready: '✅ Connecté — en écoute (lecture seule)', disconnected: '⚠️ Déconnecté, reconnexion…', error: '❌ ' };
+async function loadScan() {
+  if (!$('#scan-card')) return;
+  let s;
+  try { s = await api('/api/whatsapp-scan'); } catch { return; }
+  $('#scan-enabled').checked = s.enabled;
+  const connecting = s.enabled && s.status !== 'ready' && s.status !== 'off';
+  const st = $('#scan-status');
+  st.hidden = !s.enabled;
+  st.className = `result ${s.status === 'ready' ? 'is-ok' : s.status === 'error' ? 'is-error' : ''}`;
+  st.textContent = s.enabled ? (s.status === 'error' ? (SCAN_LABEL.error + (s.error || 'erreur')) : SCAN_LABEL[s.status] || s.status) : '';
+  $('#scan-qr').hidden = !(s.enabled && s.status === 'qr' && s.image);
+  if (s.enabled && s.status === 'qr' && s.image) $('#scan-qr-img').src = s.image;
+  const ready = s.enabled && s.status === 'ready';
+  $('#scan-group-field').hidden = !ready;
+  $('#scan-refresh').hidden = !ready;
+  $('#scan-reset').hidden = !s.enabled;
+  if (ready && !$('#scan-group').dataset.loaded) refreshGroups(s.groupId);
+  else if (ready) setGroupSelection(s.groupId);
+  // rafraîchit tant que ça se connecte (QR → prêt)
+  clearTimeout(scanTimer);
+  if (connecting) scanTimer = setTimeout(loadScan, 2500);
+}
+function setGroupSelection(groupId) {
+  const sel = $('#scan-group');
+  if (sel && [...sel.options].some((o) => o.value === groupId)) sel.value = groupId || '';
+}
+async function refreshGroups(selectId) {
+  const sel = $('#scan-group');
+  if (!sel) return;
+  try {
+    const { groups } = await api('/api/whatsapp-scan/groups');
+    sel.innerHTML = '<option value="">Tous les groupes</option>' + groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
+    sel.dataset.loaded = '1';
+    setGroupSelection(selectId || '');
+  } catch { /* pas prêt */ }
+}
+$('#scan-enabled')?.addEventListener('change', async (e) => {
+  try { await api('/api/settings', { whatsappScan: { enabled: e.target.checked } }); toast(e.target.checked ? 'Scan activé' : 'Scan désactivé'); loadScan(); }
+  catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+});
+$('#scan-group')?.addEventListener('change', async (e) => {
+  const name = e.target.selectedOptions[0]?.textContent || '';
+  try { await api('/api/settings', { whatsappScan: { groupId: e.target.value, groupName: e.target.value ? name : '' } }); toast('Groupe enregistré'); }
+  catch (err) { toast(err.message); }
+});
+$('#scan-refresh')?.addEventListener('click', () => { $('#scan-group').dataset.loaded = ''; refreshGroups($('#scan-group').value); });
+$('#scan-reset')?.addEventListener('click', async () => {
+  try { await api('/api/whatsapp-scan/reset', {}); $('#scan-group').dataset.loaded = ''; toast('Session WhatsApp oubliée'); loadScan(); }
+  catch (err) { toast(err.message); }
+});
 
 $('#settings-form').addEventListener('submit', async (e) => {
   e.preventDefault();

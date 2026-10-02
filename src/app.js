@@ -27,6 +27,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     relayUrl: '', relaySecret: '',
     telegramToken: config.telegram?.token || '',
     signature: { style: 'claude', name: 'Camille Redon' },
+    whatsappScan: { enabled: false, groupId: '', groupName: '' },
   });
   const s = settings.get();
 
@@ -71,6 +72,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     store.log('settings');
     if (v.channel !== before.channel || v.telegramToken !== before.telegramToken || v.whatsappNumber !== before.whatsappNumber
         || v.relayUrl !== before.relayUrl || v.relaySecret !== before.relaySecret) app.onChannelSettings?.(v);
+    if (JSON.stringify(v.whatsappScan) !== JSON.stringify(before.whatsappScan)) app.onScanSettings?.(v);
     return settings.public();
   }
 
@@ -78,6 +80,17 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
   bot.readSignature = () => settings.get().signature;
   bot.setSignatureStyle = (style) => updateSettings({ signature: { style } }).signature;
 
-  const app = { store, settings, planning, signer, bot, channel, members, updateSettings, onChannelSettings: null };
+  // Y a-t-il un cours à signer MAINTENANT ? (cours notifié, en cours, pas encore signé, pas en pause)
+  // Sert au scan WhatsApp : on ne signe sur un code repéré que pendant un vrai créneau à signer.
+  async function signableNow(now = new Date()) {
+    if (store.paused) return null;
+    const current = await planning.current(now, 0);
+    if (!current) return null;
+    const toSign = await planning.day(now);
+    const match = toSign.find((c) => c.id === current.id);
+    return match && !store.isDone(match.id) ? match : null;
+  }
+
+  const app = { store, settings, planning, signer, bot, channel, members, updateSettings, signableNow, onChannelSettings: null, onScanSettings: null };
   return app;
 }

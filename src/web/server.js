@@ -302,6 +302,25 @@ export function createWebServer({ app, channels, updater, desktop, password, dat
       }
     },
 
+    // ── Scan WhatsApp (lecture seule) ──
+    'GET /api/whatsapp-scan': async (req, res) => {
+      const sc = app.scanner;
+      const cfg = settings.get().whatsappScan || {};
+      const status = sc?.state?.status || 'off';
+      json(res, 200, { enabled: Boolean(cfg.enabled), groupId: cfg.groupId || '', groupName: cfg.groupName || '',
+        status, error: sc?.state?.error || null,
+        image: status === 'qr' && sc?.state?.qr ? await QRCode.toDataURL(sc.state.qr, { margin: 1, width: 260 }) : null });
+    },
+    'GET /api/whatsapp-scan/groups': async (req, res) => {
+      if (!app.scanner) return json(res, 200, { groups: [] });
+      json(res, 200, { groups: await app.scanner.listGroups().catch(() => []) });
+    },
+    'POST /api/whatsapp-scan/reset': async (req, res) => {
+      if (!app.scanner) return json(res, 400, { error: 'Scan indisponible' });
+      await app.scanner.reset().catch(() => {});
+      json(res, 200, { ok: true });
+    },
+
     'GET /api/version': async (req, res) => {
       if (!updater) return json(res, 200, { current: null, canUpdate: false, updateAvailable: false });
       json(res, 200, await updater.info());
