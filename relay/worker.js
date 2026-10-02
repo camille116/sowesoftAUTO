@@ -12,6 +12,7 @@ import { coursesFromLite, parseIcsLite } from '../src/planning/ics-lite.js';
 import { fetchIcsText } from '../src/relay/fetch-ics.js';
 
 const TAKEOVER_MS = 3 * 60e3; // au-delà, le Mac est considéré hors ligne
+const ICS_TTL_MS = 20 * 60e3; // on ne retélécharge l'agenda Hyperplanning qu'au plus toutes les 20 min
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 
@@ -45,6 +46,23 @@ async function sendTelegram(token, chatId, text) {
   return res.ok;
 }
 
+/**
+ * Agenda ICS mis en cache côté relais (KV) : évite de télécharger Hyperplanning à chaque minute
+ * quand le Mac est éteint (sinon ~1440 requêtes/jour vers l'école). On garde le texte au plus 20 min.
+ */
+async function getIcsText(env, url, fetchIcs, now) {
+  const cached = await kvGet(env, 'ics');
+  if (cached && cached.url === url && now.getTime() - cached.at < ICS_TTL_MS) return cached.text;
+  try {
+    const text = await fetchIcs(url);
+    await kvSet(env, 'ics', { url, at: now.getTime(), text });
+    return text;
+  } catch (err) {
+    if (cached && cached.url === url) return cached.text; // école injoignable : on garde l'ancien agenda
+    throw err;
+  }
+}
+
 /** Cœur du cron, isolé pour les tests : décide et envoie, met à jour l'état. now/deps injectables. */
 export async function runOnce(env, now = new Date(), deps = {}) {
   const fetchIcs = deps.fetchIcs || fetchIcsText;
@@ -57,7 +75,7 @@ export async function runOnce(env, now = new Date(), deps = {}) {
   if (now.getTime() - new Date(lastSeen).getTime() < TAKEOVER_MS) return { skipped: 'mac-online' };
 
   let icsText;
-  try { icsText = await fetchIcs(snapshot.icsUrl); } catch { return { skipped: 'ics-error' }; }
+  try { icsText = await getIcsText(env, snapshot.icsUrl, fetchIcs, now); } catch { return { skipped: 'ics-error' }; }
 
   const overrides = await kvGet(env, 'overrides', {});
   const sent = await kvGet(env, 'sent', {});
@@ -83,7 +101,7 @@ export async function handleWebhook(env, update, deps = {}) {
   let coursesToday = [], coursesTomorrow = [];
   if (snapshot.icsUrl) {
     try {
-      const parsed = parseIcsLite(await fetchIcs(snapshot.icsUrl));
+      const parsed = parseIcsLite(await getIcsText(env, snapshot.icsUrl, fetchIcs, now));
       const t = dayWindow(now); coursesToday = coursesFromLite(parsed, t[0], t[1]);
       const tm = dayWindow(new Date(now.getTime() + 864e5)); coursesTomorrow = coursesFromLite(parsed, tm[0], tm[1]);
     } catch { /* agenda indisponible : on répond quand même aux commandes simples */ }

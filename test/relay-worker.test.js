@@ -48,6 +48,20 @@ test('Mac hors ligne : le relais envoie les rappels', async () => {
   assert.equal(r2.attempted, 0);
 });
 
+test('agenda mis en cache : pas de retéléchargement à chaque minute (anti-ban Hyperplanning)', async () => {
+  const db = fakeDB(); await seed(db);
+  let fetches = 0;
+  const fetchIcs = async () => { fetches++; return icsNow(0); };
+  const now = new Date();
+  await runOnce({ DB: db }, now, { fetchIcs, send: async () => true });
+  // 5 passages de cron dans la foulée (Mac hors ligne) → l'agenda n'est pas retéléchargé
+  for (let i = 1; i <= 5; i++) await runOnce({ DB: db }, new Date(now.getTime() + i * 60e3), { fetchIcs, send: async () => true });
+  assert.equal(fetches, 1, 'un seul téléchargement grâce au cache 20 min');
+  // au-delà du TTL, on retélécharge
+  await runOnce({ DB: db }, new Date(now.getTime() + 21 * 60e3), { fetchIcs, send: async () => true });
+  assert.equal(fetches, 2, 'nouveau téléchargement après 20 min');
+});
+
 test('Mac en ligne (battement récent) : le relais ne double pas', async () => {
   const db = fakeDB(); await seed(db, { lastSeenMinAgo: 1 });
   const r = await runOnce({ DB: db }, new Date(), { fetchIcs: async () => icsNow(0), send: async () => true });
