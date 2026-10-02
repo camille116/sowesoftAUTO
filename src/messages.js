@@ -102,7 +102,8 @@ export const msg = {
   signFailed: (reason) =>
     `${BOT_TAG} ❌ Je n'ai pas réussi à signer : ${reason}\n👉 Signe à la main sur l'appli, puis réponds *fait*. Tu peux aussi me renvoyer le code.`,
   signBusy: () => `${BOT_TAG} ⏳ Je suis déjà en train de signer, une seconde…`,
-  scanDetected: (code, group) => `${BOT_TAG} 📲 Code *${code}* repéré sur WhatsApp${group ? ` (${group})` : ''} — je signe.`,
+  scanDetected: (code, group) => `${BOT_TAG} 📲 Code *${code}* repéré sur WhatsApp${group ? ` (${group})` : ''}.`,
+  scanNoCourse: () => `${BOT_TAG} ⏸️ Aucun cours à signer en ce moment : je ne signe pas (si tu penses qu'il y en a un, vérifie *planning*).`,
 
   signatureMenu: (current) =>
     `${BOT_TAG} ✍️ *Ta signature* (actuelle : ${SIGNATURE_LABELS[current] || current})\n` +

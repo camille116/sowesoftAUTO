@@ -27,7 +27,7 @@ export function extractCode(text) {
  * message avec ton compte WhatsApp. Les retours (code repéré, signé/échoué) partent sur Telegram.
  * Session dédiée (dossier séparé) → à utiliser de préférence avec un compte WhatsApp secondaire.
  */
-export function createWhatsAppScanner({ dataDir, browser, onCode, shouldSign, getConfig, clientFactory }) {
+export function createWhatsAppScanner({ dataDir, browser, onDetect, getConfig, clientFactory }) {
   const sessionDir = join(dataDir, 'whatsapp-scan-session');
   const state = { status: 'off', qr: null, error: null, group: null, since: Date.now() };
   const tried = new Map(); // code → timestamp
@@ -43,7 +43,11 @@ export function createWhatsAppScanner({ dataDir, browser, onCode, shouldSign, ge
     return tried.has(code);
   };
 
-  /** Décide à partir d'un message reçu (isolé pour les tests : pas besoin de vrai Chromium). */
+  /**
+   * Décide à partir d'un message (isolé pour les tests : pas besoin de vrai Chromium).
+   * Repère un code dans le bon groupe et le remonte toujours à l'app (onDetect), qui prévient
+   * sur Telegram et décide de signer ou non selon les heures de cours.
+   */
   async function handleMessage(message) {
     try {
       const cfg = getConfig();
@@ -55,11 +59,9 @@ export function createWhatsAppScanner({ dataDir, browser, onCode, shouldSign, ge
       if (cfg.groupId && id !== cfg.groupId) return; // pas le groupe choisi
       const code = extractCode(message.body);
       if (!code || recentlyTried(code)) return;
-      const course = await shouldSign(); // null hors heures de cours / rien à signer → on ignore
-      if (!course) { log.info(`WhatsApp scan : code ${code} ignoré (aucun cours à signer maintenant)`); return; }
       tried.set(code, Date.now());
-      log.info(`WhatsApp scan : code ${code} repéré dans « ${chat.name} » → signature`);
-      await onCode(code, { course, group: chat.name });
+      log.info(`WhatsApp scan : code ${code} repéré dans « ${chat.name} »`);
+      await onDetect(code, { group: chat.name });
     } catch (err) {
       log.warn(`WhatsApp scan : message ignoré (${err.message})`);
     }
@@ -80,8 +82,10 @@ export function createWhatsAppScanner({ dataDir, browser, onCode, shouldSign, ge
     c.on('auth_failure', (m) => setState({ status: 'error', error: `Authentification refusée : ${m}` }));
     c.on('disconnected', (reason) => { setState({ status: 'disconnected', error: `Déconnecté (${reason})` }); if (running) setTimeout(() => restart('déconnexion'), 5000); });
     c.on('ready', () => { setState({ status: 'ready', qr: null, error: null }); log.info(`WhatsApp scan prêt (lecture seule) : ${c.info?.wid?.user || '?'}`); });
-    // lecture seule : on n'écoute QUE les messages entrants, on n'envoie jamais rien
+    // lecture seule : on écoute les messages (reçus ET créés, pour capter aussi tes propres tests) ;
+    // on n'envoie jamais rien. Le dédoublonnage évite de traiter deux fois le même code.
     c.on('message', (message) => handleMessage(message));
+    c.on('message_create', (message) => handleMessage(message));
     return c;
   }
 

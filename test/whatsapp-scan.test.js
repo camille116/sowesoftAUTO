@@ -12,13 +12,12 @@ test('extractCode : repère un code de 5 chiffres, ignore le reste', () => {
   assert.equal(extractCode('rdv a 14h'), null);
 });
 
-function scanner({ config, course = { id: 'c1', subject: 'Marketing' } } = {}) {
+function scanner({ config } = {}) {
   const calls = [];
   const sc = createWhatsAppScanner({
     dataDir: '/tmp', browser: {},
     getConfig: () => config,
-    shouldSign: async () => course,
-    onCode: async (code, info) => calls.push({ code, info }),
+    onDetect: async (code, info) => calls.push({ code, info }),
     clientFactory: () => ({ on() {}, initialize() {} }),
   });
   return { sc, calls };
@@ -46,16 +45,10 @@ test('mauvais groupe : ignoré', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('hors heures de cours (rien à signer) : ignoré', async () => {
-  const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' }, course: null });
-  await sc.handleMessage(groupMsg('48213'));
-  assert.equal(calls.length, 0);
-});
-
-test('code dans le bon groupe pendant un cours : signe une seule fois (dédup)', async () => {
+test('code dans le bon groupe : remonté une seule fois (dédup)', async () => {
   const { sc, calls } = scanner({ config: { enabled: true, groupId: 'G1' } });
   await sc.handleMessage(groupMsg('le code 48213'));
-  await sc.handleMessage(groupMsg('48213 encore')); // même code → pas de 2e tentative
+  await sc.handleMessage(groupMsg('48213 encore')); // même code → pas de 2e remontée
   assert.equal(calls.length, 1);
   assert.equal(calls[0].code, '48213');
   assert.equal(calls[0].info.group, 'Classe M1');

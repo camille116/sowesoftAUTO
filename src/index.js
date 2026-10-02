@@ -96,10 +96,13 @@ const scanner = createWhatsAppScanner({
   dataDir: config.dataDir,
   browser: config.browser,
   getConfig: () => app.settings.get().whatsappScan,
-  shouldSign: () => app.signableNow(),
-  onCode: async (code, { group } = {}) => {
+  onDetect: async (code, { group } = {}) => {
+    // 1) on prévient toujours sur Telegram qu'un code a été repéré
     await app.channel.send(msg.scanDetected(code, group)).catch((e) => log.error(e));
-    await app.bot.handle(code); // signe + prévient du résultat sur Telegram
+    // 2) on ne signe que s'il y a un cours à signer maintenant (sinon on le dit, sans signer)
+    const course = await app.signableNow().catch(() => null);
+    if (course) await app.bot.handle(code);
+    else await app.channel.send(msg.scanNoCourse()).catch((e) => log.error(e));
   },
 });
 app.scanner = scanner;
