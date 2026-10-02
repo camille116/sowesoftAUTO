@@ -567,7 +567,7 @@ function setGroupSelection(groupId) {
   const sel = $('#scan-group');
   if (sel && [...sel.options].some((o) => o.value === groupId)) sel.value = groupId || '';
 }
-async function refreshGroups(selectId) {
+async function refreshGroups(selectId, { notify = false } = {}) {
   const sel = $('#scan-group');
   if (!sel) return;
   try {
@@ -575,7 +575,12 @@ async function refreshGroups(selectId) {
     sel.innerHTML = '<option value="">Tous les groupes</option>' + groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
     sel.dataset.loaded = '1';
     setGroupSelection(selectId || '');
-  } catch { /* pas prêt */ }
+    const hint = $('#scan-group-hint');
+    if (hint) hint.textContent = groups.length
+      ? `${groups.length} groupe${groups.length > 1 ? 's' : ''} trouvé${groups.length > 1 ? 's' : ''}. Laisse « Tous les groupes » si tu préfères ne pas filtrer.`
+      : 'Aucun groupe trouvé : ce compte WhatsApp est-il bien membre du groupe de ta classe ? (La synchro peut prendre 1–2 min — réessaie.) « Tous les groupes » fonctionne quand même.';
+    if (notify) toast(groups.length ? `${groups.length} groupe(s) trouvé(s)` : 'Aucun groupe trouvé pour ce compte');
+  } catch { if (notify) toast('Pas encore prêt, réessaie dans un instant'); }
 }
 $('#scan-enabled')?.addEventListener('change', async (e) => {
   try { await api('/api/settings', { whatsappScan: { enabled: e.target.checked } }); toast(e.target.checked ? 'Scan activé' : 'Scan désactivé'); loadScan(); }
@@ -586,7 +591,7 @@ $('#scan-group')?.addEventListener('change', async (e) => {
   try { await api('/api/settings', { whatsappScan: { groupId: e.target.value, groupName: e.target.value ? name : '' } }); toast('Groupe enregistré'); }
   catch (err) { toast(err.message); }
 });
-$('#scan-refresh')?.addEventListener('click', () => { $('#scan-group').dataset.loaded = ''; refreshGroups($('#scan-group').value); });
+$('#scan-refresh')?.addEventListener('click', () => { $('#scan-group').dataset.loaded = ''; refreshGroups($('#scan-group').value, { notify: true }); });
 $('#scan-reset')?.addEventListener('click', async () => {
   try { await api('/api/whatsapp-scan/reset', {}); $('#scan-group').dataset.loaded = ''; toast('Session WhatsApp oubliée'); loadScan(); }
   catch (err) { toast(err.message); }
