@@ -109,6 +109,8 @@ export class SowesignSigner {
     this.profileDir = join(dataDir, 'sowesign-profile');
     this.shotsDir = join(dataDir, 'screenshots');
     this.timeout = site.timeoutMs || 25000;
+    // durée maximale d'une tentative complète (ouverture + code + signature) avant coupure forcée
+    this.maxRunMs = site.maxRunMs || 120000;
     this.busy = false;
     // Après un échec de connexion on ne réessaie plus tout seul : SoWeSoft bloque le compte après 3 essais.
     this.loginLocked = null;
@@ -132,6 +134,10 @@ export class SowesignSigner {
       userDataDir: this.profileDir,
       args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=fr-FR', ...(this.browserOpts.extraArgs || [])],
     });
+    // Garde-fou : si une étape se bloque (clic sur un canevas masqué, bouton introuvable…),
+    // on ferme le navigateur après maxRunMs → les opérations en attente échouent et on répond
+    // toujours quelque chose, au lieu de rester bloqué indéfiniment.
+    const watchdog = setTimeout(() => { browser.close().catch(() => {}); }, this.maxRunMs);
     try {
       const page = await browser.newPage();
       page.setDefaultTimeout(this.timeout);
@@ -144,7 +150,8 @@ export class SowesignSigner {
       await page.setViewport({ width: 420, height: 860, isMobile: true });
       return await fn(page);
     } finally {
-      await browser.close();
+      clearTimeout(watchdog);
+      await browser.close().catch(() => {});
     }
   }
 
@@ -284,12 +291,35 @@ export class SowesignSigner {
     return state;
   }
 
-  /** Ferme les fenêtres d'information (mentions légales, aide…) qui s'affichent par-dessus le code. */
-  async closePopups(page, waitMs = 2500) {
+  /**
+   * Ferme les fenêtres d'information (mentions légales, aide…) qui s'affichent par-dessus le code
+   * et, surtout, par-dessus le pavé de signature (sinon les clics tombent sur la popup).
+   * On cherche le bouton « Fermer » dans TOUTE la page (le conteneur de la popup varie selon
+   * les versions de SoWeSoft), en priorité le plus en avant-plan (z-index le plus haut).
+   */
+  async closePopups(page, waitMs = 3000) {
     const deadline = Date.now() + waitMs;
+    let closed = false;
     while (Date.now() < deadline) {
-      if (await this.clickByText(page, `${this.sel.popup} *`, this.texts.closePopup)) await sleep(600);
-      else await sleep(300);
+      const clicked = await page.evaluate((labels) => {
+        const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").toLowerCase().trim();
+        const wanted = labels.map(norm);
+        const visible = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        const candidates = [...document.querySelectorAll('button, a, div, span, [role="button"], .cursor-pointer, .button, .btn')]
+          .filter((e) => wanted.includes(norm(e.innerText || e.textContent)) && visible(e));
+        if (!candidates.length) return false;
+        const zOf = (e) => { let z = 0; for (let n = e; n; n = n.parentElement) { const v = parseInt(getComputedStyle(n).zIndex, 10); if (!Number.isNaN(v)) z = Math.max(z, v); } return z; };
+        const depth = (e) => { let d = 0; for (let n = e; n; n = n.parentElement) d++; return d; };
+        const pointer = (e) => getComputedStyle(e).cursor === 'pointer';
+        // on vise le vrai bouton, pas son conteneur : curseur « main » d'abord, puis l'avant-plan
+        // (popup la plus récente), puis l'élément le plus profond (le bouton lui-même).
+        candidates.sort((a, b) => (pointer(b) - pointer(a)) || (zOf(b) - zOf(a)) || (depth(b) - depth(a)));
+        candidates[0].click();
+        return true;
+      }, this.texts.closePopup).catch(() => false);
+      if (clicked) { closed = true; await sleep(700); } // une popup fermée peut en révéler une autre
+      else if (closed) break; // plus rien à fermer
+      else await sleep(300); // la popup peut apparaître avec un léger retard
     }
   }
 
@@ -316,8 +346,12 @@ export class SowesignSigner {
   }
 
   async drawSignature(page) {
+    // une popup (mentions légales…) peut recouvrir le canevas : on la ferme d'abord, sinon les
+    // clics de souris tombent dessus et la signature ne se trace jamais.
+    await this.closePopups(page, 1500);
     const canvas = await page.waitForSelector(this.sel.signatureCanvas, { visible: true });
     const box = await canvas.boundingBox();
+    if (!box) throw new Error('canevas de signature masqué (une fenêtre est peut-être ouverte par-dessus)');
     for (const stroke of signatureStrokes(box.width, box.height)) {
       await page.mouse.move(box.x + stroke[0][0], box.y + stroke[0][1]);
       await page.mouse.down();
@@ -325,9 +359,13 @@ export class SowesignSigner {
       await page.mouse.up();
     }
     await sleep(300);
-    const validate = await page.$(this.sel.signatureValidate);
-    if (!validate) throw new Error('bouton « Valider » de la signature introuvable');
-    await validate.click();
+    // on vise le bouton « Valider » par son libellé (plus fiable que .cursor-pointer, qui peut
+    // aussi désigner « Effacer »), avec repli sur le sélecteur configuré.
+    if (!(await this.clickByText(page, `${this.sel.signatureValidate}, app-signature-component button, app-signature-component div`, this.texts.validate))) {
+      const validate = await page.$(this.sel.signatureValidate);
+      if (!validate) throw new Error('bouton « Valider » de la signature introuvable');
+      await validate.click();
+    }
   }
 
   /** Après la saisie du code : attend la suite (pad de signature, validation, erreur). */

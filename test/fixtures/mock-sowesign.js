@@ -42,16 +42,19 @@ const portal = (institution) => html(
 );
 
 const student = html(
+  // La vraie popup « Informations légales » n'utilise pas forcément un conteneur app-popup : ici
+  // un conteneur « inconnu » (legal-modal) qui RECOUVRE toute la page (pointer-events) → tant qu'on
+  // ne clique pas FERMER, les clics de souris (donc la signature) tombent sur la popup.
   `<app-root>
-    <app-popup id="popup"><div class="modal"><div>INFORMATIONS LÉGALES</div>
-      <div class="footer uppercase"><div class="cursor-pointer" id="close" style="cursor:pointer">FERMER</div></div></div></app-popup>
+    <div class="legal-modal" id="popup" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4)">
+      <div class="card"><div>INFORMATIONS LÉGALES ET CONFIDENTIALITÉ</div>
+      <div class="footer"><span id="close" style="cursor:pointer">FERMER</span></div></div></div>
     <app-detection><p>Saisissez le code à 5 chiffres</p>
       <app-code-detection id="zone"><div id="boxes">${'<div class="box"><span>0</span></div>'.repeat(5)}</div><div id="err"></div></app-code-detection>
     </app-detection>
   </app-root>`,
   `
-  if (localStorage.getItem('rgpd')) document.getElementById('popup').remove();
-  document.getElementById('close')?.addEventListener('click', () => { localStorage.setItem('rgpd', '1'); document.getElementById('popup').remove(); });
+  document.getElementById('close')?.addEventListener('click', () => { document.getElementById('popup').remove(); });
   let code = '';
   const zone = document.getElementById('zone');
   const render = () => zone.querySelectorAll('.box span').forEach((s, i) => (s.textContent = code[i] || '0'));
