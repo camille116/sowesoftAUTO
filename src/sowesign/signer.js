@@ -556,6 +556,49 @@ export class SowesignSigner {
     }
   }
 
+  /**
+   * Signe un cours SANS code (autonomie, projet…) : ouvre l'espace étudiant et, si le pavé de
+   * signature est directement proposé (aucun code demandé), signe. Si un code est requis, renvoie
+   * { needsCode: true } sans rien faire. Renvoie { ok, already?, needsCode?, reason?, screenshot }.
+   */
+  async signCurrent() {
+    if (this.busy) return { ok: false, busy: true };
+    this.busy = true;
+    try {
+      return await this.withPage(async (page) => {
+        try {
+          const state = await this.open(page);
+          const shot = (name) => this.screenshot(page, name);
+
+          if (state === 'validated' && includesAny(await this.bodyText(page), this.texts.presenceRegistered)) {
+            return { ok: true, already: true, screenshot: await shot('deja-signe') };
+          }
+          // Un code est demandé → on ne peut pas signer tout seul : on laisse la main (rappels/scan).
+          if (state === 'detection') return { ok: false, needsCode: true, screenshot: await shot('code-requis') };
+
+          const blocked = {
+            noCourse: 'SoWeSoft n’affiche aucun cours en ce moment',
+            nextCourse: 'la signature n’est pas encore ouverte sur SoWeSoft',
+            wrongTime: 'SoWeSoft signale une heure d’appareil incorrecte',
+            accessDenied: 'accès refusé par SoWeSoft',
+          }[state];
+          if (blocked) return { ok: false, reason: blocked, screenshot: await shot(state) };
+
+          if (this.dryRun) return { ok: true, dryRun: true, screenshot: await shot('dry-run') };
+          // state === 'signature' (ou menant au pavé) : finish() dessine et valide.
+          const result = await this.finish(page);
+          return { ...result, screenshot: await shot(result.ok ? 'signe' : 'echec') };
+        } catch (err) {
+          return { ok: false, reason: err.message, screenshot: await this.screenshot(page, 'erreur') };
+        }
+      });
+    } catch (err) {
+      return { ok: false, reason: `navigateur : ${err.message}` };
+    } finally {
+      this.busy = false;
+    }
+  }
+
   /** Vérifie la connexion (et débloque la reconnexion après un échec). */
   async check() {
     this.loginLocked = null;

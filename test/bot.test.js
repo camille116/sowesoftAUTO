@@ -8,13 +8,18 @@ import { memoryStore } from './helpers.js';
 const manual = { weekly: [{ day: 'mardi', start: '13:30', end: '17:00', title: 'Autonomie projet' }] };
 const at = (hhmm) => new Date(`2026-10-06T${hhmm}:00+02:00`); // un mardi
 
-function setup(signResult = { ok: true, screenshot: '/tmp/x.png' }) {
+function setup(signResult = { ok: true, screenshot: '/tmp/x.png' }, opts = {}) {
   const sent = [];
   const store = memoryStore();
-  const signer = { busy: false, calls: [], async sign(code) { this.calls.push(code); return signResult; }, async check() { return { ok: true }; } };
+  const signer = {
+    busy: false, calls: [], currentCalls: 0,
+    async sign(code) { this.calls.push(code); return signResult; },
+    async signCurrent() { this.currentCalls++; return opts.signCurrentResult || { ok: false, needsCode: true }; },
+    async check() { return { ok: true }; },
+  };
   const bot = new Bot({
     planning: new Planning({ icsUrl: '', keywords: [], manual }),
-    store, signer, offsets: [-5, 0, 15], dryRun: false,
+    store, signer, offsets: [-5, 0, 15], dryRun: false, autoSign: Boolean(opts.autoSign),
     send: async (text, image) => sent.push({ text, image }),
   });
   return { bot, sent, store, signer };
@@ -61,6 +66,31 @@ test('pause coupe les rappels', async () => {
   await bot.handle('pause', at('13:00'));
   await bot.tick(at('13:30'));
   assert.equal(sent.length, 1);
+});
+
+test('auto-signature d’un cours sans code', async () => {
+  const { bot, sent, store, signer } = setup({}, { autoSign: true, signCurrentResult: { ok: true, screenshot: '/tmp/a.png' } });
+  await bot.tick(at('13:35'));
+  assert.equal(signer.currentCalls, 1);
+  assert.ok(sent.some((s) => /Signé automatiquement/.test(s.text)), 'message de signature auto');
+  assert.equal(Object.values(store.state.sessions)[0].signedBy, 'auto');
+  await bot.tick(at('13:40')); // déjà signé → pas de nouvel essai
+  assert.equal(signer.currentCalls, 1);
+});
+
+test('cours qui demande un code : pas de signature auto', async () => {
+  const { bot, sent, signer } = setup({}, { autoSign: true, signCurrentResult: { ok: false, needsCode: true } });
+  await bot.tick(at('13:35'));
+  assert.equal(signer.currentCalls, 1);
+  assert.ok(!sent.some((s) => /automatiquement/.test(s.text)));
+  await bot.tick(at('13:40')); // on n’insiste pas : le code viendra par rappel/scan
+  assert.equal(signer.currentCalls, 1);
+});
+
+test('auto-signature désactivée : on ne tente rien', async () => {
+  const { bot, signer } = setup({}, { autoSign: false });
+  await bot.tick(at('13:35'));
+  assert.equal(signer.currentCalls, 0);
 });
 
 test('planning du jour', async () => {

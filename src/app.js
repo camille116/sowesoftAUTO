@@ -19,6 +19,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     keywords: config.planning.keywords,
     reminderOffsets: config.reminders.offsets,
     dryRun: config.sowesign.dryRun,
+    autoSign: false,
     auth: config.sowesign.auth,
     notify: { mode: 'auto', subjects: [] },
     channel: config.channel || 'telegram',
@@ -52,6 +53,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     send: (...args) => channel.send(...args),
     offsets: s.reminderOffsets,
     dryRun: s.dryRun,
+    autoSign: s.autoSign,
     members,
     sendToMember: (...args) => channel.sendToMember(...args),
     memberTemplate: s.memberTemplate,
@@ -66,6 +68,7 @@ export function createApp(config, { send, signer: customSigner, fetcher } = {}) 
     bot.memberTemplate = v.memberTemplate;
     bot.offsets = v.reminderOffsets;
     bot.dryRun = signer.dryRun = v.dryRun;
+    bot.autoSign = v.autoSign;
     signer.auth = v.auth;
     signer.signature = v.signature;
     signer.loginLocked = null; // nouveaux identifiants : on autorise un nouvel essai

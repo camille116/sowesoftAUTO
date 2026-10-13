@@ -10,7 +10,7 @@ import { log } from './logger.js';
  * et l'appli web appelle directement les mêmes méthodes (sign, markDone, skip…).
  */
 export class Bot {
-  constructor({ planning, store, signer, send, offsets, dryRun, members = null, sendToMember = null, memberTemplate = '' }) {
+  constructor({ planning, store, signer, send, offsets, dryRun, members = null, sendToMember = null, memberTemplate = '', autoSign = false }) {
     this.members = members; // camarades de classe : rappels seulement
     this.sendToMember = sendToMember;
     this.memberTemplate = memberTemplate;
@@ -20,6 +20,8 @@ export class Bot {
     this.send = send;
     this.offsets = offsets;
     this.dryRun = dryRun;
+    this.autoSign = autoSign; // signature auto des cours SANS code (autonomie, projet…)
+    this.autoAttempt = new Map(); // id du cours → { nextAt, stop } (évite de relancer Chromium en boucle)
   }
 
   /** Appelé toutes les TICK_SECONDS : envoie les rappels dus. */
@@ -33,6 +35,42 @@ export class Bot {
       log.info(`Rappel envoyé (${reminder.offset} min) pour ${reminder.session.title}`);
     }
     await this.tickMembers(sessions, now);
+    await this.autoSignTick(now).catch((e) => log.warn(`Auto-signature : ${e.message}`));
+  }
+
+  /**
+   * Signe automatiquement le cours en cours s'il ne demande pas de code (autonomie, projet…).
+   * Lance au plus un essai toutes les 5 min par cours, s'arrête dès que c'est signé ou qu'un code
+   * est requis (on laisse alors les rappels / le scan WhatsApp faire).
+   */
+  async autoSignTick(now = new Date()) {
+    if (!this.autoSign || this.store.paused || this.signer.busy) return;
+    const current = await this.planning.current(now, 0);
+    if (!current || this.store.isDone(current.id)) return;
+    const toSign = await this.planning.day(now);
+    if (!toSign.some((c) => c.id === current.id)) return; // pas un cours à signer
+
+    const rec = this.autoAttempt.get(current.id) || { nextAt: 0, tries: 0, stop: false };
+    if (rec.stop || now.getTime() < rec.nextAt) return;
+    rec.tries++;
+    rec.nextAt = now.getTime() + 5 * 60e3; // pas plus d'un essai toutes les 5 min
+    this.autoAttempt.set(current.id, rec);
+
+    const result = await this.signer.signCurrent();
+    this.store.log('auto-sign', { title: current.title, ok: result.ok, reason: result.reason, needsCode: result.needsCode });
+
+    if (result.ok) {
+      rec.stop = true;
+      if (!result.dryRun) this.store.markSigned(current.id, 'auto');
+      if (!result.already) await this.send(result.dryRun ? msg.autoDryRun(current) : msg.autoSigned(current), result.screenshot);
+    } else if (result.needsCode) {
+      rec.stop = true; // ce cours demande un code : on laisse les rappels / le scan WhatsApp
+    } else if (result.busy) {
+      rec.nextAt = now.getTime() + 60e3; // occupé : on réessaie dans 1 min
+    } else if (rec.tries >= 3) {
+      rec.stop = true; // trois échecs (cours pas encore ouvert, erreur…) : on arrête et on prévient
+      await this.send(msg.autoSignFailed(current, result.reason), result.screenshot);
+    }
   }
 
   async tickMembers(sessions, now) {

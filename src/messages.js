@@ -102,6 +102,9 @@ export const msg = {
   signFailed: (reason) =>
     `${BOT_TAG} ❌ Je n'ai pas réussi à signer : ${reason}\n👉 Signe à la main sur l'appli, puis réponds *fait*. Tu peux aussi me renvoyer le code.`,
   signBusy: () => `${BOT_TAG} ⏳ Je suis déjà en train de signer, une seconde…`,
+  autoSigned: (session) => `${BOT_TAG} ✍️ *Signé automatiquement* (cours sans code)${session ? `\n${slot(session)}` : ''}`,
+  autoDryRun: (session) => `${BOT_TAG} 🧪 Mode test : ce cours est signable sans code${session ? `\n${slot(session)}` : ''} (je n'ai pas validé).`,
+  autoSignFailed: (session, reason) => `${BOT_TAG} ⚠️ Signature auto impossible${session ? ` pour ${slot(session)}` : ''} : ${reason}\n👉 Signe à la main, ou envoie le code si on t'en donne un.`,
   scanDetected: (code, group) => `${BOT_TAG} 📲 Code *${code}* repéré sur WhatsApp${group ? ` (${group})` : ''}.`,
   scanNoCourse: () => `${BOT_TAG} ⏸️ Aucun cours à signer en ce moment : je ne signe pas (si tu penses qu'il y en a un, vérifie *planning*).`,
 

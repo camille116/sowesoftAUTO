@@ -88,7 +88,27 @@ const student = html(
   }`,
 );
 
-export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret' } = {}) {
+// Cours SANS code : le pavé de signature est proposé directement (aucune saisie de code).
+const studentDirect = html(
+  `<app-root>
+    <app-signature><app-signature-component><signature-pad><canvas width="360" height="200" style="width:360px;height:200px;border:1px solid #ccc"></canvas></signature-pad>
+      <div class="text cursor-pointer" id="validate" style="cursor:pointer">Valider</div></app-signature-component></app-signature>
+  </app-root>`,
+  `
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, minX = 1e9, maxX = -1;
+  canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+  canvas.addEventListener('mousemove', (e) => { if (!drawing) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); minX = Math.min(minX, e.offsetX); maxX = Math.max(maxX, e.offsetX); });
+  window.addEventListener('mouseup', () => (drawing = false));
+  document.getElementById('validate').addEventListener('click', async () => {
+    if (maxX - minX < canvas.width * 0.5) { document.body.insertAdjacentHTML('beforeend', '<app-toast>Erreur : signature trop petite</app-toast>'); return; }
+    await fetch('/api/sign', { method: 'POST', body: 'NOCODE' });
+    document.querySelector('app-signature').outerHTML = '<app-validated>Votre présence a bien été enregistrée à 14:02</app-validated>';
+  });`,
+);
+
+export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret', directSign = false } = {}) {
   const signatures = [];
   const logins = [];
   const server = createServer((req, res) => {
@@ -109,7 +129,7 @@ export function startMockSowesign({ institution = '7705', validCode = '48213', e
       if (url.pathname === '/api/sign') { signatures.push(body); return send(200, '{}'); }
       if (url.pathname === '/login') return send(200, portal(institution));
       if (url.pathname === '/error') return send(200, html('<h1>Erreur d’authentification</h1><p>L’adresse e-mail et/ou le mot de passe sont incorrects</p>'));
-      if (url.pathname.startsWith('/student')) return logged ? send(200, student) : send(302, '', { location: '/login' });
+      if (url.pathname.startsWith('/student')) return logged ? send(200, directSign ? studentDirect : student) : send(302, '', { location: '/login' });
       send(404, 'not found');
     });
   });

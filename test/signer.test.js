@@ -61,6 +61,26 @@ test('réutilise la session sans se reconnecter', { skip }, async () => {
   assert.equal(mock.logins.length, logins, 'pas de nouvelle connexion');
 });
 
+test('signCurrent : cours sans code → signe directement', { skip }, async () => {
+  const direct = await startMockSowesign({ directSign: true });
+  try {
+    const s = new SowesignSigner({
+      site: { ...site, portalUrl: `${direct.base}/login`, studentUrl: `${direct.base}/student/`, timeoutMs: 8000 },
+      auth: { method: 'password', institution: '7705', email: 'eleve@ecole.fr', password: 'secret' },
+      dryRun: false, browser: { headless: true, executablePath: chrome }, dataDir: mkdtempSync(join(tmpdir(), 'sowesign-')),
+    });
+    const result = await s.signCurrent();
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(direct.signatures.at(-1), 'NOCODE');
+  } finally { direct.close(); }
+});
+
+test('signCurrent : cours qui demande un code → needsCode (ne signe pas)', { skip }, async () => {
+  const result = await signer().signCurrent();
+  assert.equal(result.ok, false);
+  assert.equal(result.needsCode, true);
+});
+
 test('remonte le refus du code', { skip }, async () => {
   const result = await signer().sign('11111');
   assert.equal(result.ok, false);

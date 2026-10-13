@@ -510,8 +510,13 @@ async function loadSettings() {
   rsec.placeholder = s.hasRelaySecret ? '•••••• (inchangée)' : 'Clé affichée par le script';
   setMethod(s.auth.method);
   setSignature(s.signature || { style: 'claude', name: 'Camille Redon' });
+  if ($('#autosign-enabled')) $('#autosign-enabled').checked = Boolean(s.autoSign);
   loadScan();
 }
+$('#autosign-enabled')?.addEventListener('change', async (e) => {
+  try { await api('/api/settings', { autoSign: e.target.checked }); toast(e.target.checked ? 'Signature auto activée' : 'Signature auto désactivée'); }
+  catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+});
 
 // ── Style de signature ────────────────────────────────────
 let signatureStyle = 'claude';

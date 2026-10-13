@@ -53,6 +53,7 @@ export class Settings {
       next.reminderOffsets = [...new Set(offsets)].sort((a, b) => a - b);
     }
     if ('dryRun' in patch) next.dryRun = Boolean(patch.dryRun);
+    if ('autoSign' in patch) next.autoSign = Boolean(patch.autoSign);
     if (patch.notify) {
       const mode = patch.notify.mode ?? next.notify?.mode ?? 'auto';
       if (!['auto', 'all', 'custom'].includes(mode)) throw new Error('Choix de notifications inconnu');
