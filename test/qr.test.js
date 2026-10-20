@@ -121,7 +121,7 @@ test('Telegram : la photo du propriétaire est téléchargée et lue, celle d’
 
 test('relais : « 0 » transmis au Mac s’il est allumé, sinon réponse claire', () => {
   assert.deepEqual(relay({ text: '0' }, true).signCode, { code: 'autonomie' });
-  assert.match(relay({ text: 'autonomie' }, false).replies[0].text, /prochain passage/);
+  assert.match(relay({ text: 'autonomie' }, false).replies[0].text, /Mac est éteint/);
   assert.equal(parseCommand('0').type, 'autonomy');
   assert.equal(parseCommand('48213').type, 'sign');
 });
