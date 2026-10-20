@@ -298,6 +298,8 @@ export class SowesignSigner {
     for (const [name, selector] of Object.entries(this.pages)) {
       if (await page.$(selector)) return name;
     }
+    // Écran « Votre cours — Merci de signer pour votre cours » avec un bouton « Signer » (cours sans code)
+    if (includesAny(await this.bodyText(page), this.texts.signPrompt || ['merci de signer'])) return 'signButton';
     return null;
   }
 
@@ -499,9 +501,19 @@ export class SowesignSigner {
   async finish(page) {
     let deadline = Date.now() + this.timeout;
     let signed = false;
+    let lastClick = 0;
     while (Date.now() < deadline) {
       const text = await this.bodyText(page);
       if (includesAny(text, this.texts.presenceRegistered)) return { ok: true };
+
+      // Bouton « Signer » à cliquer pour ouvrir le pavé (une fois toutes les 3 s au plus)
+      if (!signed && Date.now() - lastClick > 3000 && !(await page.$(this.pages.signature))
+          && includesAny(text, this.texts.signPrompt || ['merci de signer'])) {
+        lastClick = Date.now();
+        await this.clickByText(page, 'button, app-button, ion-button, a, div, span', this.texts.signButton || ['signer', 'sign']);
+        await sleep(800);
+        continue;
+      }
       if (includesAny(text, this.texts.signatureExpired)) return { ok: false, reason: 'la période de signature est terminée' };
 
       const codeError = await page.$eval(this.sel.codeError, (e) => e.innerText.trim()).catch(() => null);

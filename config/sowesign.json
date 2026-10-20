@@ -28,13 +28,49 @@
     "accessDenied": "app-access-denied"
   },
   "texts": {
-    "modeCode": ["code d’identification", "code d'identification", "identification code"],
-    "modePassword": ["mot de passe", "password"],
-    "validate": ["valider", "validate"],
-    "closePopup": ["fermer", "close"],
-    "presenceRegistered": ["présence a bien été enregistrée", "presence has been registered"],
-    "signatureExpired": ["période de signature a expiré", "signature period has expired", "n'autorise plus la signature"],
-    "loginErrors": ["code est invalide", "code is invalid", "tentative de connexion erronée", "incorrect login attempt", "mot de passe sont incorrects", "password are incorrect"]
+    "modeCode": [
+      "code d’identification",
+      "code d'identification",
+      "identification code"
+    ],
+    "modePassword": [
+      "mot de passe",
+      "password"
+    ],
+    "validate": [
+      "valider",
+      "validate"
+    ],
+    "closePopup": [
+      "fermer",
+      "close"
+    ],
+    "presenceRegistered": [
+      "présence a bien été enregistrée",
+      "presence has been registered"
+    ],
+    "signatureExpired": [
+      "période de signature a expiré",
+      "signature period has expired",
+      "n'autorise plus la signature"
+    ],
+    "loginErrors": [
+      "code est invalide",
+      "code is invalid",
+      "tentative de connexion erronée",
+      "incorrect login attempt",
+      "mot de passe sont incorrects",
+      "password are incorrect"
+    ],
+    "signPrompt": [
+      "merci de signer",
+      "please sign",
+      "veuillez signer"
+    ],
+    "signButton": [
+      "signer",
+      "sign"
+    ]
   },
   "timeoutMs": 25000
 }

@@ -108,7 +108,14 @@ const studentDirect = html(
   });`,
 );
 
-export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret', directSign = false } = {}) {
+// Écran réel actuel : « Merci de signer pour votre cours » + bouton « Signer » qui ouvre le pavé
+const studentButton = html(
+  `<app-root><app-home><p>Votre cours</p><p>Merci de signer pour votre cours</p>
+    <div class="button cursor-pointer" id="go" style="cursor:pointer"><span>Signer</span></div></app-home></app-root>`,
+  `document.getElementById('go').addEventListener('click', () => { location.href = '/student/pad'; });`,
+);
+
+export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret', directSign = false, signButton = false } = {}) {
   const signatures = [];
   const logins = [];
   const server = createServer((req, res) => {
@@ -129,7 +136,7 @@ export function startMockSowesign({ institution = '7705', validCode = '48213', e
       if (url.pathname === '/api/sign') { signatures.push(body); return send(200, '{}'); }
       if (url.pathname === '/login') return send(200, portal(institution));
       if (url.pathname === '/error') return send(200, html('<h1>Erreur d’authentification</h1><p>L’adresse e-mail et/ou le mot de passe sont incorrects</p>'));
-      if (url.pathname.startsWith('/student')) return logged ? send(200, directSign ? studentDirect : student) : send(302, '', { location: '/login' });
+      if (url.pathname.startsWith('/student')) return logged ? send(200, signButton ? (url.pathname === '/student/pad' ? studentDirect : studentButton) : directSign ? studentDirect : student) : send(302, '', { location: '/login' });
       send(404, 'not found');
     });
   });

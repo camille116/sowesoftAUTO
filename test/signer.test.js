@@ -130,3 +130,17 @@ test('signLink : lien qui mène à la saisie du code → needsCode', { skip }, a
   assert.equal(result.ok, false);
   assert.equal(result.needsCode, true);
 });
+
+test('signCurrent : écran « Merci de signer » + bouton Signer → clique, dessine, signe', { skip }, async () => {
+  const btn = await startMockSowesign({ signButton: true });
+  try {
+    const s = new SowesignSigner({
+      site: { ...site, portalUrl: `${btn.base}/login`, studentUrl: `${btn.base}/student/`, timeoutMs: 8000 },
+      auth: { method: 'password', institution: '7705', email: 'eleve@ecole.fr', password: 'secret' },
+      dryRun: false, browser: { headless: true, executablePath: chrome }, dataDir: mkdtempSync(join(tmpdir(), 'sowesign-')),
+    });
+    const result = await s.signCurrent();
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(btn.signatures.at(-1), 'NOCODE');
+  } finally { btn.close(); }
+});
