@@ -1,6 +1,8 @@
 import puppeteer from 'puppeteer';
-import { mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { toMjpeg } from '../qr.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const normalize = (t) =>
@@ -243,12 +245,12 @@ export class SowesignSigner {
     }
   }
 
-  async withPage(fn) {
+  async withPage(fn, extraArgs = []) {
     const browser = await puppeteer.launch({
       headless: this.browserOpts.headless,
       executablePath: this.browserOpts.executablePath,
       userDataDir: this.profileDir,
-      args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=fr-FR', ...(this.browserOpts.extraArgs || [])],
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=fr-FR', ...(this.browserOpts.extraArgs || []), ...extraArgs],
     });
     // Garde-fou : si une étape se bloque (clic sur un canevas masqué, bouton introuvable…),
     // on ferme le navigateur après maxRunMs → les opérations en attente échouent et on répond
@@ -644,6 +646,109 @@ export class SowesignSigner {
     } catch (err) {
       return { ok: false, reason: `navigateur : ${err.message}` };
     } finally {
+      this.busy = false;
+    }
+  }
+
+  /**
+   * Clique l'option « QR code » de l'appli SoWeSoft (par son libellé, ou par un attribut contenant « qr »).
+   * Si elle n'est pas visible, ouvre d'abord le menu. Renvoie { clicked, seen } : `seen` liste les
+   * éléments cliquables vus, pour diagnostiquer quand SoWeSoft change son interface.
+   */
+  async clickQrOption(page) {
+    let seen = [];
+    for (let round = 0; round < 2; round++) {
+      const r = await page.evaluate((labels, openMenu) => {
+        const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").toLowerCase().trim().replace(/\s+/g, ' ');
+        const wanted = labels.map(norm);
+        const visible = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+        const all = [...document.querySelectorAll('body *')].filter(visible);
+        const attrHit = (e, re) => ['aria-label', 'title', 'alt', 'class', 'id', 'src', 'name', 'href'].some((a) => re.test(String(e.getAttribute(a) || '')));
+        const clickable = (e) => {
+          for (let n = e; n && n !== document.body; n = n.parentElement) {
+            if (getComputedStyle(n).cursor === 'pointer' || ['BUTTON', 'A'].includes(n.tagName) || n.getAttribute('role') === 'button') return n;
+          }
+          return e;
+        };
+        const byText = all.filter((e) => { const t = norm(e.innerText); return t && t.length <= 40 && wanted.some((w) => t === w || t.startsWith(`${w} `)); });
+        const byAttr = all.filter((e) => attrHit(e, /(^|[^a-z])qr/i));
+        const pick = byText.at(-1) || byAttr.at(-1);
+        if (pick) { clickable(pick).click(); return { clicked: true }; }
+        const seen = [...new Set(all.filter((e) => getComputedStyle(e).cursor === 'pointer')
+          .map((e) => (e.innerText || e.getAttribute('aria-label') || e.getAttribute('title') || e.className || '').toString().trim().replace(/\s+/g, ' ').slice(0, 30))
+          .filter(Boolean))].slice(0, 12);
+        if (openMenu) { // l'option est peut-être dans le menu (burger)
+          const menu = all.find((e) => attrHit(e, /(menu|burger|hamburger|nav-?toggle)/i));
+          if (menu) { clickable(menu).click(); return { clicked: false, menu: true, seen }; }
+        }
+        return { clicked: false, seen };
+      }, this.texts.qrOption || ['qr code', 'qr', 'scanner'], round === 0);
+      seen = r.seen || seen;
+      if (r.clicked) return { clicked: true, seen };
+      if (!r.menu) break;
+      await sleep(700); // le menu s'ouvre, on réessaie
+    }
+    return { clicked: false, seen };
+  }
+
+  /**
+   * Signe en présentant une image de QR code au scanner de SoWeSoft, via une fausse caméra qui diffuse
+   * cette image (même geste que « Appli SoWeSoft → QR code → scanner », sans téléphone).
+   * Renvoie { ok, dryRun?, already?, reason?, screenshot } — la raison liste ce qu'on voit si l'option QR est introuvable.
+   */
+  async signQrImage(imageBuffer) {
+    if (this.busy) return { ok: false, busy: true };
+    const video = toMjpeg(imageBuffer);
+    if (!video) return { ok: false, reason: 'image illisible : envoie une photo JPEG ou PNG' };
+    this.busy = true;
+    const dir = mkdtempSync(join(tmpdir(), 'linked-qr-'));
+    const file = join(dir, 'qr.mjpeg');
+    writeFileSync(file, video);
+    try {
+      return await this.withPage(async (page) => {
+        try {
+          const shot = (name) => this.screenshot(page, name);
+          const state = await this.open(page);
+          if (state === 'validated' && includesAny(await this.bodyText(page), this.texts.presenceRegistered)) {
+            return { ok: true, already: true, screenshot: await shot('deja-signe') };
+          }
+          const blocked = {
+            noCourse: 'SoWeSoft n’affiche aucun cours en ce moment',
+            nextCourse: 'la signature n’est pas encore ouverte sur SoWeSoft',
+            wrongTime: 'SoWeSoft signale une heure d’appareil incorrecte',
+            accessDenied: 'accès refusé par SoWeSoft',
+          }[state];
+          if (blocked) return { ok: false, reason: blocked, screenshot: await shot(state) };
+
+          if (state !== 'signature') { // sinon le pavé est déjà là : pas besoin de scanner
+            const opened = await this.clickQrOption(page);
+            if (!opened.clicked) {
+              const seen = opened.seen.length ? ` (éléments vus : ${opened.seen.join(' · ')})` : '';
+              return { ok: false, reason: `option « QR code » introuvable dans SoWeSoft${seen}`, screenshot: await shot('qr-introuvable') };
+            }
+            await sleep(1000); // la caméra démarre
+          }
+          if (this.dryRun) {
+            const deadline = Date.now() + this.timeout;
+            while (Date.now() < deadline) {
+              if (await page.$(this.pages.signature)) return { ok: true, dryRun: true, screenshot: await shot('dry-run') };
+              await sleep(500);
+            }
+            return { ok: false, reason: 'le scanner de SoWeSoft n’a pas lu le QR (image floue, trop petite ou coupée ?)', screenshot: await shot('qr-non-lu') };
+          }
+          const result = await this.finish(page);
+          if (!result.ok && /pas de confirmation/.test(result.reason || '')) {
+            result.reason = 'le scanner de SoWeSoft n’a pas lu le QR (image floue, trop petite ou coupée ?)';
+          }
+          return { ...result, screenshot: await shot(result.ok ? 'signe' : 'echec') };
+        } catch (err) {
+          return { ok: false, reason: err.message, screenshot: await this.screenshot(page, 'erreur') };
+        }
+      }, ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${file}`]);
+    } catch (err) {
+      return { ok: false, reason: `navigateur : ${err.message}` };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
       this.busy = false;
     }
   }

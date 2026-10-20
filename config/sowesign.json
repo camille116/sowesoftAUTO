@@ -32,6 +32,7 @@
     "modePassword": ["mot de passe", "password"],
     "validate": ["valider", "validate"],
     "closePopup": ["fermer", "close"],
+    "qrOption": ["qr code", "qrcode", "qr", "scanner", "scanner un qr code", "scan"],
     "presenceRegistered": ["présence a bien été enregistrée", "presence has been registered"],
     "signatureExpired": ["période de signature a expiré", "signature period has expired", "n'autorise plus la signature"],
     "loginErrors": ["code est invalide", "code is invalid", "tentative de connexion erronée", "incorrect login attempt", "mot de passe sont incorrects", "password are incorrect"]
