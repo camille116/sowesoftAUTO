@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import { parseCommand } from './commands.js';
 import { decodeQr } from './qr.js';
+import { currentAutoSignCourse } from './autosign.js';
 import { dueReminders } from './reminders.js';
 import { msg, renderTemplate } from './messages.js';
 import { log } from './logger.js';
@@ -46,10 +47,9 @@ export class Bot {
    */
   async autoSignTick(now = new Date()) {
     if (!this.autoSign || this.store.paused || this.signer.busy) return;
-    const current = await this.planning.current(now, 0);
+    // seulement l'autonomie et le projet pro for good (cours sans code)
+    const current = await currentAutoSignCourse(this.planning, now);
     if (!current || this.store.isDone(current.id)) return;
-    const toSign = await this.planning.day(now);
-    if (!toSign.some((c) => c.id === current.id)) return; // pas un cours à signer
 
     const rec = this.autoAttempt.get(current.id) || { nextAt: 0, tries: 0, stop: false };
     if (rec.stop || now.getTime() < rec.nextAt) return;
