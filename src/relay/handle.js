@@ -110,6 +110,11 @@ export function relayHandle({ update, snapshot, overrides = {}, coursesToday = [
         signCode = { code: cmd.code };
         reply(chatId, `✍️ Code *${cmd.code}* transmis à ton Mac, je signe… (quelques secondes)`);
         break;
+      case 'autonomy':
+        if (!macOnline) { reply(chatId, '💤 Ton Mac est éteint : le cloud signera ton cours d’autonomie à son prochain passage (en général sous 15–30 min).'); break; }
+        signCode = { code: 'autonomie' }; // le Mac reconnaît la commande et signe
+        reply(chatId, '⏳ Transmis à ton Mac, je signe ton cours d’autonomie…');
+        break;
       case 'link':
         if (!macOnline) { reply(chatId, '💤 Ton Mac est éteint, je ne peux pas signer à distance. Signe sur l’appli SoWeSoft, puis réponds *fait*.'); break; }
         signCode = { code: cmd.url }; // le Mac reconnaît le lien et le traite comme un QR

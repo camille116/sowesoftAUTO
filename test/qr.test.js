@@ -118,3 +118,10 @@ test('Telegram : la photo du propriétaire est téléchargée et lue, celle d’
   assert.deepEqual(got, ['48213']);
   assert.equal(asked.filter((x) => x === 'getFile').length, 1, 'le fichier de l’inconnu n’est même pas téléchargé');
 });
+
+test('relais : « 0 » transmis au Mac s’il est allumé, sinon réponse claire', () => {
+  assert.deepEqual(relay({ text: '0' }, true).signCode, { code: 'autonomie' });
+  assert.match(relay({ text: 'autonomie' }, false).replies[0].text, /prochain passage/);
+  assert.equal(parseCommand('0').type, 'autonomy');
+  assert.equal(parseCommand('48213').type, 'sign');
+});

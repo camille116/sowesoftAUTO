@@ -17,6 +17,7 @@ const COMMANDS = [
   ['fait', "J'ai signé moi-même"],
   ['pause', 'Couper les rappels'],
   ['reprendre', 'Relancer les rappels'],
+  ['autonomie', "Signer tout de suite le cours d'autonomie"],
   ['signature', 'Choisir le dessin de la signature'],
   ['test', 'Tester la connexion SoWeSoft'],
 ];

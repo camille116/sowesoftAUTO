@@ -121,6 +121,7 @@ export class Bot {
     switch (cmd.type) {
       case 'sign': return this.sign(cmd.code, now);
       case 'link': return this.signLink(cmd.url, now);
+      case 'autonomy': return this.signAutonomyNow(now);
       case 'help': return this.send(msg.help(this.dryRun));
       case 'today': return this.send(await this.fullDay(now, "Aujourd'hui"));
       case 'tomorrow': {
@@ -252,6 +253,24 @@ export class Bot {
     }
     log.info('QR lu mais contenu non reconnu');
     return this.send(msg.qrUnknown(text));
+  }
+
+  /** « 0 » / « autonomie » : signe tout de suite le cours d'autonomie en cours (sans code). */
+  async signAutonomyNow(now = new Date()) {
+    const course = await currentAutoSignCourse(this.planning, now);
+    if (!course) return this.send(msg.noAutonomyNow());
+    if (this.store.isDone(course.id)) return this.send(msg.alreadySigned(course));
+    if (this.signer.busy) return this.send(msg.signBusy());
+    await this.send(msg.autoSigning(course));
+    const result = await this.signer.signCurrent();
+    this.store.log('auto-sign', { title: course.title, ok: result.ok, reason: result.reason, needsCode: result.needsCode });
+    this.autoAttempt.set(course.id, { nextAt: 0, tries: 1, stop: Boolean(result.ok || result.needsCode) });
+    if (result.ok) {
+      if (!result.dryRun) this.store.markSigned(course.id, 'auto');
+      return this.send(result.dryRun ? msg.autoDryRun(course) : result.already ? msg.alreadySigned(course) : msg.autoSigned(course), result.screenshot);
+    }
+    if (result.needsCode) return this.send(msg.linkNeedsCode(), result.screenshot);
+    return this.send(msg.signFailed(result.reason), result.screenshot);
   }
 
   /** Change le style de signature tracée (commande « signature … »). */

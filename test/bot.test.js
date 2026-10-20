@@ -115,3 +115,14 @@ test('/demain : tous les cours avec salle, bâtiment et campus', async () => {
   assert.match(text, /▫️ \*08:30–10:30\* Marketplaces _crs_\n {6}📍 EM009 · Eiffel 1 \(Amphithéâtre\) \+1 salle/);
   assert.match(text, /⬜ \*17:30–19:30\* Marketplaces _autonomie_\n {6}📍 C-3\.12 · Eiffel 3/);
 });
+
+test('« 0 » / « autonomie » : signe tout de suite le cours d’autonomie en cours', async () => {
+  const { bot, sent, store, signer } = setup({}, { signCurrentResult: { ok: true } });
+  await bot.handle('0', at('09:00')); // hors cours
+  assert.match(sent.at(-1).text, /Aucun cours d'autonomie/);
+  await bot.handle('autonomie', at('13:40'));
+  assert.equal(signer.currentCalls, 1);
+  assert.ok(sent.some((s) => /m'apprête à signer/.test(s.text)));
+  assert.match(sent.at(-1).text, /Signé automatiquement/);
+  assert.equal(Object.values(store.state.sessions)[0].signedBy, 'auto');
+});

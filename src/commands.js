@@ -16,6 +16,7 @@ const ALIASES = [
   { type: 'pause', words: ['pause', 'stop', 'vacances'] },
   { type: 'resume', words: ['reprendre', 'reprise', 'start', 'resume', 'go'] },
   { type: 'test', words: ['test', 'tester', 'check'] },
+  { type: 'autonomy', words: ['0', 'autonomie', 'auto'] }, // signer tout de suite le cours d'autonomie en cours
 ];
 
 function clean(text) {
