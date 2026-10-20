@@ -1,7 +1,4 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
-
-const JSQR = readFileSync(new URL('../../node_modules/jsqr/dist/jsQR.js', import.meta.url), 'utf8');
 
 /**
  * Fausse appli SoWeSoft qui reproduit la structure de la vraie (relevée sur app.sowesign.com) :
@@ -111,55 +108,7 @@ const studentDirect = html(
   });`,
 );
 
-// Appli avec option « QR code » : ouvre la caméra (getUserMedia), lit chaque image avec jsQR et envoie
-// le contenu au serveur ; si le serveur l'accepte, le pavé de signature apparaît (comme la vraie appli).
-const studentQr = html(
-  `<app-root>
-    <app-detection><p>Saisissez le code à 5 chiffres</p>
-      <app-code-detection id="zone"><div id="boxes">${'<div class="box"><span>0</span></div>'.repeat(5)}</div></app-code-detection>
-      <div id="qrbtn" class="cursor-pointer" style="cursor:pointer">QR code</div>
-      <video id="cam" autoplay muted playsinline width="320" height="240"></video>
-    </app-detection>
-  </app-root><script src="/jsqr.js"></script>`,
-  `
-  function showPad() {
-    document.querySelector('app-detection').outerHTML =
-      '<app-signature><app-signature-component><signature-pad><canvas width="360" height="200" style="width:360px;height:200px;border:1px solid #ccc"></canvas></signature-pad>' +
-      '<div class="text cursor-pointer" id="validate" style="cursor:pointer">Valider</div></app-signature-component></app-signature>';
-    const canvas = document.querySelector('canvas');
-    const ctx = canvas.getContext('2d');
-    let drawing = false, minX = 1e9, maxX = -1;
-    canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
-    canvas.addEventListener('mousemove', (e) => { if (!drawing) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); minX = Math.min(minX, e.offsetX); maxX = Math.max(maxX, e.offsetX); });
-    window.addEventListener('mouseup', () => (drawing = false));
-    document.getElementById('validate').addEventListener('click', async () => {
-      if (maxX - minX < canvas.width * 0.5) { document.body.insertAdjacentHTML('beforeend', '<app-toast>Erreur : signature trop petite</app-toast>'); return; }
-      await fetch('/api/sign', { method: 'POST', body: 'QR' });
-      document.querySelector('app-signature').outerHTML = '<app-validated>Votre présence a bien été enregistrée à 14:02</app-validated>';
-    });
-  }
-  document.getElementById('qrbtn').addEventListener('click', async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    const video = document.getElementById('cam');
-    video.srcObject = stream;
-    await video.play();
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const timer = setInterval(async () => {
-      if (!video.videoWidth) return;
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const found = jsQR(img.data, img.width, img.height);
-      if (!found) return;
-      clearInterval(timer);
-      const res = await fetch('/api/qr', { method: 'POST', body: found.data });
-      if (res.ok) { stream.getTracks().forEach((t) => t.stop()); showPad(); }
-    }, 200);
-  });`,
-);
-
-export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret', directSign = false, qrScan = false, qrPayload = 'SWS-QR-PAYLOAD' } = {}) {
+export function startMockSowesign({ institution = '7705', validCode = '48213', email = 'eleve@ecole.fr', password = 'secret', directSign = false } = {}) {
   const signatures = [];
   const logins = [];
   const server = createServer((req, res) => {
@@ -176,13 +125,11 @@ export function startMockSowesign({ institution = '7705', validCode = '48213', e
           ? send(200, '{}', { 'set-cookie': 'sid=ok; Path=/; Max-Age=3600' })
           : send(400, '{}');
       }
-      if (url.pathname === '/jsqr.js') return send(200, JSQR, { 'content-type': 'application/javascript' });
-      if (url.pathname === '/api/qr') return send(body === qrPayload ? 200 : 400, '{}');
       if (url.pathname === '/api/checkcode') return send(body === validCode ? 200 : 400, '{}');
       if (url.pathname === '/api/sign') { signatures.push(body); return send(200, '{}'); }
       if (url.pathname === '/login') return send(200, portal(institution));
       if (url.pathname === '/error') return send(200, html('<h1>Erreur d’authentification</h1><p>L’adresse e-mail et/ou le mot de passe sont incorrects</p>'));
-      if (url.pathname.startsWith('/student')) return logged ? send(200, qrScan ? studentQr : directSign ? studentDirect : student) : send(302, '', { location: '/login' });
+      if (url.pathname.startsWith('/student')) return logged ? send(200, directSign ? studentDirect : student) : send(302, '', { location: '/login' });
       send(404, 'not found');
     });
   });

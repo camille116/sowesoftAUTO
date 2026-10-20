@@ -18,22 +18,6 @@ function toRgba(buffer) {
 }
 
 /**
- * Transforme une image (JPEG/PNG) en « vidéo » MJPEG de quelques images identiques : c'est le format
- * que Chromium accepte comme fausse caméra (--use-file-for-fake-video-capture). Le robot s'en sert
- * pour présenter ton QR au scanner de SoWeSoft, comme si tu le filmais. null si l'image est illisible.
- */
-export function toMjpeg(buffer, frames = 15) {
-  try {
-    const img = buffer?.length ? toRgba(buffer) : null;
-    if (!img || img.width * img.height > MAX_PIXELS) return null;
-    const frame = jpeg.encode({ data: img.data, width: img.width, height: img.height }, 90).data; // JPEG propre, sans miniature EXIF
-    return Buffer.concat(Array.from({ length: frames }, () => frame));
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Lit le QR code d'une photo/capture (JPEG ou PNG) et renvoie son contenu texte, ou null si aucun
  * QR n'est lisible. Ne lance jamais d'exception (image corrompue, format inconnu → null).
  */

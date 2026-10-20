@@ -46,7 +46,7 @@ test('liens : seul https + sowesign.com est accepté (la session connectée ne s
 
 function botWith(signLink) {
   const sent = [];
-  const signer = { busy: false, signLinkCalls: [], qrCalls: [], async signLink(url) { this.signLinkCalls.push(url); return signLink; }, async signQrImage(buf) { this.qrCalls.push(buf); return signLink; }, async sign() { return { ok: true }; } };
+  const signer = { busy: false, signLinkCalls: [], async signLink(url) { this.signLinkCalls.push(url); return signLink; }, async sign() { return { ok: true }; } };
   const bot = new Bot({
     planning: new Planning({ icsUrl: '', keywords: [], manual: { weekly: [], dates: [] } }),
     store: memoryStore(), signer, offsets: [0], dryRun: false,
@@ -70,21 +70,13 @@ test('lien envoyé en texte : même chemin que le QR ; lien qui demande un code 
   assert.match(sent.at(-1).text, /code à 5 chiffres/);
 });
 
-test('QR au contenu propre à SoWeSoft (ou illisible pour moi) : l’appli le scanne elle-même', async () => {
-  const { bot, sent, signer } = botWith({ ok: true, screenshot: '/tmp/x.png' });
-  const opaque = await qrPng('i/%e'); // contenu ni lien ni code
-  await bot.handlePhoto(opaque);
-  await bot.handlePhoto(Buffer.from('flou')); // image dont je ne lis rien : SoWeSoft essaie quand même
-  assert.equal(signer.qrCalls.length, 2);
+test('QR au contenu inconnu ou image sans QR : rien n’est signé', async () => {
+  const { bot, sent, signer } = botWith({ ok: true });
+  await bot.handlePhoto(await qrPng('https://evil.com/phishing'));
+  assert.match(sent.at(-1).text, /appli SoWeSign/);
+  await bot.handlePhoto(Buffer.from('rien'));
+  assert.match(sent.at(-1).text, /pas de QR code lisible/);
   assert.equal(signer.signLinkCalls.length, 0);
-  assert.ok(sent.some((s) => /scanner ton QR par SoWeSoft/.test(s.text)));
-  assert.ok(sent.some((s) => /Signé/.test(s.text)));
-});
-
-test('échec du scanner SoWeSoft : le bot le dit avec la raison', async () => {
-  const { bot, sent } = botWith({ ok: false, reason: 'option « QR code » introuvable dans SoWeSoft' });
-  await bot.handlePhoto(await qrPng('opaque'));
-  assert.match(sent.at(-1).text, /introuvable/);
 });
 
 const snapshot = { owner: { chatId: 1, done: {} }, members: [], keywords: ['autonomie'], notify: { mode: 'auto' } };

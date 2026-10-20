@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import QRCode from 'qrcode';
 import { SowesignSigner, signatureStrokes } from '../src/sowesign/signer.js';
 import { startMockSowesign } from './fixtures/mock-sowesign.js';
 
@@ -130,46 +129,4 @@ test('signLink : lien qui mène à la saisie du code → needsCode', { skip }, a
   const result = await signer().signLink(`${mock.base}/student/qr/jeton`);
   assert.equal(result.ok, false);
   assert.equal(result.needsCode, true);
-});
-
-function qrSigner(qr) {
-  return new SowesignSigner({
-    site: { ...site, portalUrl: `${qr.base}/login`, studentUrl: `${qr.base}/student/`, timeoutMs: 8000 },
-    auth: { method: 'password', institution: '7705', email: 'eleve@ecole.fr', password: 'secret' },
-    dryRun: false, browser: { headless: true, executablePath: chrome }, dataDir: mkdtempSync(join(tmpdir(), 'sowesign-')),
-  });
-}
-
-test('signQrImage : l’appli lit le QR via une caméra simulée, puis on signe', { skip }, async () => {
-  const qr = await startMockSowesign({ qrScan: true, qrPayload: 'SWS-QR-PAYLOAD' });
-  try {
-    const png = await QRCode.toBuffer('SWS-QR-PAYLOAD', { margin: 4, scale: 10 });
-    const result = await qrSigner(qr).signQrImage(png);
-    assert.equal(result.ok, true, result.reason);
-    assert.equal(qr.signatures.at(-1), 'QR');
-  } finally { qr.close(); }
-});
-
-test('signQrImage : QR d’un autre cours (refusé par l’appli) → pas de signature', { skip }, async () => {
-  const qr = await startMockSowesign({ qrScan: true, qrPayload: 'SWS-QR-PAYLOAD' });
-  try {
-    const png = await QRCode.toBuffer('AUTRE-COURS', { margin: 4, scale: 10 });
-    const result = await qrSigner(qr).signQrImage(png);
-    assert.equal(result.ok, false);
-    assert.match(result.reason, /n’a pas lu le QR/);
-    assert.equal(qr.signatures.length, 0);
-  } finally { qr.close(); }
-});
-
-test('signQrImage : option QR introuvable → dit ce qui est visible', { skip }, async () => {
-  const png = await QRCode.toBuffer('x', { margin: 4, scale: 10 });
-  const result = await signer().signQrImage(png); // la fausse appli « code » n’a pas d’option QR
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /option « QR code » introuvable/);
-});
-
-test('signQrImage : image illisible refusée sans ouvrir le navigateur', async () => {
-  const result = await signer().signQrImage(Buffer.from('pas une image'));
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /image illisible/);
 });
