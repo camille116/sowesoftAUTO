@@ -152,3 +152,13 @@ test('webhook : secret d’en-tête invalide → 401', async () => {
   const res = await mod.fetch(new Request('https://r/tg', { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': 'MAUVAIS', 'content-type': 'application/json' }, body: '{}' }), { DB: db, RELAY_SECRET: 'S' }, { waitUntil() {} });
   assert.equal(res.status, 401);
 });
+
+test('webhook : la photo d’un QR est mise en file pour le Mac et acquittée (Mac en ligne)', async () => {
+  const { handleWebhook } = await import('../relay/worker.js');
+  const db = fakeDB(); await seed(db, { lastSeenMinAgo: 1 });
+  const sent = [];
+  const deps = { fetchIcs: async () => icsNow(0), send: async (t, chat, text) => sent.push({ chat, text }) };
+  await handleWebhook({ DB: db }, { message: { chat: { id: 1 }, from: { id: 1 }, photo: [{ file_id: 'petite' }, { file_id: 'grande' }] } }, deps);
+  assert.deepEqual(JSON.parse(db.kv.get('codeQueue')).map((q) => q.photo), ['grande']);
+  assert.ok(sent.some((x) => x.chat === 1 && /Photo transmise/.test(x.text)));
+});
