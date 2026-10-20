@@ -108,6 +108,7 @@ export const msg = {
   linkNeedsCode: () => `${BOT_TAG} 🔢 Ce lien demande un *code à 5 chiffres* : envoie-le-moi et je signe.`,
   qrNotFound: () => `${BOT_TAG} 🔍 Je ne trouve pas de QR code lisible sur cette image. Recadre-le (QR bien net, bien en face) ou envoie le lien / le code.`,
   qrUnknown: () => `${BOT_TAG} 📲 Ce QR code ne se lit que dans l'*appli SoWeSign* (la version web n'a pas de scanner), je ne peux donc pas signer pour toi.\n👉 Scanne-le dans l'appli, puis réponds *fait* pour que j'arrête de te relancer.`,
+  autoSigning: (session) => `${BOT_TAG} ⏳ Je m'apprête à signer automatiquement${session ? `\n${slot(session)}` : ''}…`,
   autoSigned: (session) => `${BOT_TAG} ✍️ *Signé automatiquement* (cours sans code)${session ? `\n${slot(session)}` : ''}`,
   autoDryRun: (session) => `${BOT_TAG} 🧪 Mode test : ce cours est signable sans code${session ? `\n${slot(session)}` : ''} (je n'ai pas validé).`,
   autoSignFailed: (session, reason) => `${BOT_TAG} ⚠️ Signature auto impossible${session ? ` pour ${slot(session)}` : ''} : ${reason}\n👉 Signe à la main, ou envoie le code si on t'en donne un.`,

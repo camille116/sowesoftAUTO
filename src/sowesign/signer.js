@@ -126,7 +126,13 @@ const CLAUDE_SHAPE = {
     return spans;
   },
 };
-const claudeStrokes = (width, height) => fillByScan(width, height, CLAUDE_SHAPE);
+// Mascotte Claude en haut (60 % du cadre) et, en dessous, une légende manuscrite (« i was here »).
+function claudeStrokes(width, height, caption = '') {
+  if (!caption) return fillByScan(width, height, CLAUDE_SHAPE);
+  const top = height * 0.6;
+  const text = nameStrokes(width, height - top, caption).map((s) => s.map(([x, y]) => [x, y + top]));
+  return [...fillByScan(width, top, CLAUDE_SHAPE), ...text];
+}
 const psgStrokes = (width, height) => fillByScan(width, height, PSG);
 
 // ── Police manuscrite minimale ───────────────────────────────────────────────
@@ -165,6 +171,10 @@ const GLYPHS = {
   ] },
   i: { w: 0.26, strokes: [[[0.12, 0.45], [0.12, 0.8]], [[0.12, 0.3], [0.12, 0.34]]] },
   l: { w: 0.26, strokes: [[[0.13, 0.14], [0.13, 0.8]]] },
+  w: { w: 0.7, strokes: [[[0.08, 0.46], [0.2, 0.8], [0.34, 0.52], [0.48, 0.8], [0.6, 0.46]]] },
+  s: { w: 0.6, strokes: [[[0.48, 0.5], [0.38, 0.46], [0.22, 0.46], [0.13, 0.52], [0.18, 0.6], [0.42, 0.66], [0.48, 0.73], [0.42, 0.8], [0.24, 0.8], [0.12, 0.75]]] },
+  h: { w: 0.62, strokes: [[[0.12, 0.14], [0.12, 0.8]], [[0.12, 0.52], [0.2, 0.46], [0.34, 0.46], [0.44, 0.52], [0.44, 0.8]]] },
+  r: { w: 0.46, strokes: [[[0.12, 0.46], [0.12, 0.8]], [[0.12, 0.54], [0.22, 0.47], [0.38, 0.46]]] },
 };
 
 // Trace un nom « à la main » : on pose les glyphes côte à côte, puis on met le mot à l'échelle
@@ -199,7 +209,8 @@ export function signatureStrokes(width, height, opts = 'claude') {
   const style = typeof opts === 'string' ? opts : opts?.style || 'claude';
   if (style === 'name') return nameStrokes(width, height, (typeof opts === 'object' && opts?.name) || 'Camille Redon');
   if (style === 'psg') return psgStrokes(width, height);
-  return claudeStrokes(width, height);
+  const caption = typeof opts === 'object' && opts?.caption != null ? opts.caption : 'i was here';
+  return claudeStrokes(width, height, caption);
 }
 
 /**

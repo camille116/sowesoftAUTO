@@ -82,7 +82,7 @@ test('cours qui demande un code : pas de signature auto', async () => {
   const { bot, sent, signer } = setup({}, { autoSign: true, signCurrentResult: { ok: false, needsCode: true } });
   await bot.tick(at('13:35'));
   assert.equal(signer.currentCalls, 1);
-  assert.ok(!sent.some((s) => /automatiquement/.test(s.text)));
+  assert.ok(!sent.some((s) => /Signé automatiquement/.test(s.text)));
   await bot.tick(at('13:40')); // on n’insiste pas : le code viendra par rappel/scan
   assert.equal(signer.currentCalls, 1);
 });

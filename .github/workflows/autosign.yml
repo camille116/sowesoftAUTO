@@ -7,7 +7,7 @@ name: Auto-signature autonomie (Mac éteint)
 
 on:
   schedule:
-    - cron: '*/20 6-18 * * 1-5'
+    - cron: '*/15 6-18 * * 1-5' # toutes les 15 min, en semaine
   workflow_dispatch: {}
 
 concurrency:

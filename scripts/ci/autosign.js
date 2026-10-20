@@ -47,6 +47,7 @@ async function sign() {
     dataDir: config.dataDir,
     signature: { style: process.env.SIGNATURE_STYLE || 'claude', name: process.env.SIGNATURE_NAME || 'Camille Redon' },
   });
+  await notify(`🤖 ⏳ Je m'apprête à signer ${course.subject || course.title} (cloud, Mac éteint)…`);
   const result = await signer.signCurrent();
   console.log('Résultat :', JSON.stringify({ ok: result.ok, already: result.already, needsCode: result.needsCode, reason: result.reason }));
   const name = course.subject || course.title;

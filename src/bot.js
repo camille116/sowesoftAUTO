@@ -57,6 +57,7 @@ export class Bot {
     rec.nextAt = now.getTime() + 5 * 60e3; // pas plus d'un essai toutes les 5 min
     this.autoAttempt.set(current.id, rec);
 
+    if (rec.tries === 1) await this.send(msg.autoSigning(current)); // prévenir avant de signer
     const result = await this.signer.signCurrent();
     this.store.log('auto-sign', { title: current.title, ok: result.ok, reason: result.reason, needsCode: result.needsCode });
 
