@@ -16,6 +16,8 @@ $WRANGLER login || die "Connexion à Cloudflare annulée. Relance : npm run rela
 
 # 1. Base de données D1 (ignore l'erreur si elle existe déjà)
 bold "📦 Base de données…"
+ACCOUNT="$($WRANGLER whoami 2>/dev/null | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | head -1)"
+[ -n "$ACCOUNT" ] && echo "   compte Cloudflare : $ACCOUNT  (doit être celui où ton relais existe déjà)"
 CREATE_OUT="$($WRANGLER d1 create linked-relay 2>&1)"
 echo "$CREATE_OUT"
 UUID='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
@@ -23,7 +25,17 @@ DB_ID="$(printf '%s' "$CREATE_OUT" | grep -oiE "$UUID" | head -1)"
 # base déjà créée (ton cas) : on récupère son id autrement
 [ -n "$DB_ID" ] || DB_ID="$($WRANGLER d1 info linked-relay 2>/dev/null | grep -oiE "$UUID" | head -1)"
 [ -n "$DB_ID" ] || DB_ID="$($WRANGLER d1 list --json 2>/dev/null | grep -oiE "$UUID" | head -1)"
-[ -n "$DB_ID" ] || die "Impossible de récupérer l'identifiant de la base. Relance la commande."
+if [ -z "$DB_ID" ]; then
+  if printf '%s' "$CREATE_OUT" | grep -qiE 'authentication error|code: 10000|permission|insufficient'; then
+    die "Cloudflare refuse l'accès à la base de données (permissions de la connexion).
+     1) Vérifie le compte affiché plus haut : est-ce celui où ton relais existe déjà ?
+     2) Déconnecte-toi puis relance, en acceptant TOUTES les permissions sur la page Cloudflare :
+          npx wrangler@4 logout
+          npm run relay:deploy
+     3) Si ça persiste sur un compte neuf : ouvre https://dash.cloudflare.com → Workers & Pages (ça active D1), puis relance."
+  fi
+  die "Impossible de récupérer l'identifiant de la base. Relance la commande."
+fi
 # On écrit l'id dans une copie locale (wrangler.toml reste intact dans Git)
 sed "s/database_id = \"PLACEHOLDER\"/database_id = \"$DB_ID\"/" wrangler.toml > wrangler.generated.toml
 echo "   base : $DB_ID"
