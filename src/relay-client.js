@@ -7,7 +7,7 @@ const PUSH_MS = 15e3; // toutes les 15 s : récupère vite les codes à signer m
  * pour qu'il prenne le relais des rappels quand le Mac est éteint. Récupère aussi ce que le relais
  * a déjà envoyé, pour ne pas envoyer de doublon au retour du Mac.
  */
-export function createRelayClient({ settings, store, members, telegram, onCode = null, fetchImpl = fetch }) {
+export function createRelayClient({ settings, store, members, telegram, onCode = null, onPhoto = null, fetchImpl = fetch }) {
   let timer = null;
 
   const config = () => {
@@ -88,7 +88,10 @@ export function createRelayClient({ settings, store, members, telegram, onCode =
   /** Signe les codes mis en file par le cloud (envoyés par toi Mac allumé). */
   async function processCodes(queue) {
     for (const item of queue || []) {
-      try { await onCode?.(item.code); } catch (err) { log.warn(`Code ${item.code} : ${err.message}`); }
+      try {
+        if (item.photo) await onPhoto?.(item.photo); // photo de QR mise en file par le cloud
+        else await onCode?.(item.code);
+      } catch (err) { log.warn(`Signature demandée par le cloud : ${err.message}`); } // pas de code/lien dans les logs
     }
   }
 

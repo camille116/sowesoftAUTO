@@ -34,7 +34,31 @@ const SIGN_STYLES = [
   { style: 'psg', words: ['psg', 'paris', 'foot', 'eiffel'] },
 ];
 
+/**
+ * Cherche un lien SoWeSoft dans un texte et le renvoie nettoyé, sinon null.
+ * SÉCURITÉ : on n'accepte que https + le domaine sowesign.com (et ses sous-domaines) : ce lien sera
+ * ouvert avec ta session SoWeSoft connectée, on ne doit jamais ouvrir n'importe quelle adresse.
+ */
+export function sowesignUrl(raw) {
+  const m = /https:\/\/[^\s<>"'`]+/i.exec(String(raw || ''));
+  if (!m) return null;
+  try {
+    const url = new URL(m[0].replace(/[.,;:!?)\]]+$/, ''));
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    if (host !== 'sowesign.com' && !host.endsWith('.sowesign.com')) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function parseCommand(raw) {
+  // Un lien SoWeSoft (ex. celui d'un QR code) : à vérifier avant tout (le texte nettoyé est en minuscules,
+  // or un lien est sensible à la casse).
+  const link = sowesignUrl(raw);
+  if (link) return { type: 'link', url: link };
+
   const text = clean(raw);
   if (!text) return { type: 'unknown' };
 

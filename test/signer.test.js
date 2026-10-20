@@ -110,3 +110,23 @@ test('mauvais mot de passe : une seule tentative, puis plus de reconnexion autom
   assert.match(second.reason, /connexion suspendue/);
   assert.equal(mock.logins.length, attempts, 'aucune nouvelle tentative');
 });
+
+test('signLink : lien de QR menant au pavé de signature → signe', { skip }, async () => {
+  const direct = await startMockSowesign({ directSign: true });
+  try {
+    const s = new SowesignSigner({
+      site: { ...site, portalUrl: `${direct.base}/login`, studentUrl: `${direct.base}/student/`, timeoutMs: 8000 },
+      auth: { method: 'password', institution: '7705', email: 'eleve@ecole.fr', password: 'secret' },
+      dryRun: false, browser: { headless: true, executablePath: chrome }, dataDir: mkdtempSync(join(tmpdir(), 'sowesign-')),
+    });
+    const result = await s.signLink(`${direct.base}/student/qr/jeton`);
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(direct.signatures.at(-1), 'NOCODE');
+  } finally { direct.close(); }
+});
+
+test('signLink : lien qui mène à la saisie du code → needsCode', { skip }, async () => {
+  const result = await signer().signLink(`${mock.base}/student/qr/jeton`);
+  assert.equal(result.ok, false);
+  assert.equal(result.needsCode, true);
+});

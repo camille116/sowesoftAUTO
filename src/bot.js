@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import { parseCommand } from './commands.js';
+import { decodeQr } from './qr.js';
 import { dueReminders } from './reminders.js';
 import { msg, renderTemplate } from './messages.js';
 import { log } from './logger.js';
@@ -118,6 +119,7 @@ export class Bot {
 
     switch (cmd.type) {
       case 'sign': return this.sign(cmd.code, now);
+      case 'link': return this.signLink(cmd.url, now);
       case 'help': return this.send(msg.help(this.dryRun));
       case 'today': return this.send(await this.fullDay(now, "Aujourd'hui"));
       case 'tomorrow': {
@@ -203,6 +205,52 @@ export class Bot {
       await this.send(result.already ? msg.alreadySigned(current) : msg.signed(current), result.screenshot);
     }
     return { ...result, session: current };
+  }
+
+  /** Signe à partir d'un lien SoWeSoft (contenu d'un QR code). Le lien n'est ni affiché ni journalisé. */
+  async signLink(url, now = new Date()) {
+    if (this.signer.busy) {
+      await this.send(msg.signBusy());
+      return { ok: false, busy: true };
+    }
+    await this.send(msg.signingLink());
+    const result = await this.signer.signLink(url);
+    if (result.busy) {
+      await this.send(msg.signBusy());
+      return result;
+    }
+
+    const current = await this.planning.current(now);
+    this.store.log('sign', {
+      code: 'QR', title: current?.title, ok: result.ok, dryRun: Boolean(result.dryRun),
+      reason: result.needsCode ? 'le lien demande un code' : result.reason,
+      screenshot: result.screenshot ? basename(result.screenshot) : undefined,
+    });
+
+    if (result.dryRun) await this.send(msg.dryRunLink(), result.screenshot);
+    else if (result.needsCode) await this.send(msg.linkNeedsCode(), result.screenshot);
+    else if (!result.ok) await this.send(msg.signFailed(result.reason), result.screenshot);
+    else {
+      if (current) this.store.markSigned(current.id, 'bot');
+      await this.send(msg.signed(current), result.screenshot);
+    }
+    return { ...result, session: current };
+  }
+
+  /**
+   * Une photo reçue : on y cherche un QR code. Contenu = lien SoWeSoft ou code à 5 chiffres → on signe ;
+   * sinon on dit ce qu'on a lu (pour pouvoir s'adapter) sans rien faire.
+   */
+  async handlePhoto(buffer, now = new Date()) {
+    const text = decodeQr(buffer);
+    if (!text) return this.send(msg.qrNotFound());
+    const cmd = parseCommand(text);
+    if (cmd.type === 'sign' || cmd.type === 'link') {
+      log.info(`QR lu (${cmd.type})`);
+      return this.handle(text, now);
+    }
+    log.info('QR lu mais contenu non reconnu');
+    return this.send(msg.qrUnknown(text));
   }
 
   /** Change le style de signature tracée (commande « signature … »). */

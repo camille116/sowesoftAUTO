@@ -18,6 +18,7 @@ const welcome = (channel) => () => channel.send(msg.welcome()).catch((e) => log.
 const telegram = createTelegram({
   dataDir: config.dataDir,
   onMessage: (text) => app.bot.handle(text),
+  onPhoto: (buffer) => app.bot.handlePhoto(buffer), // photo d'un QR code → je le lis et je signe
   // message d'accueil seulement quand tu relies le bot (pas à chaque démarrage)
   onOwnerLinked: () => welcome(telegram)(),
   // camarades de classe : rappels seulement
@@ -61,7 +62,8 @@ const channels = {
 // Relais cloud : pousse l'état vers Cloudflare pour les rappels (et commandes) quand le Mac est éteint
 const relay = createRelayClient({
   settings: app.settings, store: app.store, members: app.members, telegram,
-  onCode: (code) => app.bot.handle(code), // un code mis en file par le cloud → le Mac signe
+  onCode: (code) => app.bot.handle(code), // un code (ou lien de QR) mis en file par le cloud → le Mac signe
+  onPhoto: async (fileId) => app.bot.handlePhoto(await telegram.downloadFile(fileId)), // photo de QR reçue par le cloud
 });
 app.relay = relay;
 

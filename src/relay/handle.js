@@ -61,6 +61,18 @@ export function relayHandle({ update, snapshot, overrides = {}, coursesToday = [
     return { replies, overrides: next, signCode };
   }
 
+  // ── Photo d'un QR code (propriétaire seulement) : le relais ne sait pas la lire, il la passe au Mac ──
+  if (!message.text && (message.photo || message.document?.mime_type?.startsWith('image/'))) {
+    if (!(snapshot.owner?.chatId && chatId === snapshot.owner.chatId)) return { replies, overrides: next, signCode };
+    if (!macOnline) {
+      reply(chatId, '💤 Ton Mac est éteint, je ne peux pas lire le QR ni signer. Signe sur l’appli SoWeSoft, puis réponds *fait*.');
+    } else {
+      signCode = { photo: message.photo ? message.photo.at(-1).file_id : message.document.file_id };
+      reply(chatId, '📷 Photo transmise à ton Mac, je lis le QR et je signe… (quelques secondes)');
+    }
+    return { replies, overrides: next, signCode };
+  }
+
   const raw = String(message.text || '').trim();
   if (!raw) return { replies, overrides: next, signCode };
   const start = /^\/start(?:@\w+)?\s*(\S*)/i.exec(raw);
@@ -97,6 +109,11 @@ export function relayHandle({ update, snapshot, overrides = {}, coursesToday = [
         if (!macOnline) { reply(chatId, '💤 Ton Mac est éteint, je ne peux pas signer à distance. Signe sur l’appli SoWeSoft, puis réponds *fait*.'); break; }
         signCode = { code: cmd.code };
         reply(chatId, `✍️ Code *${cmd.code}* transmis à ton Mac, je signe… (quelques secondes)`);
+        break;
+      case 'link':
+        if (!macOnline) { reply(chatId, '💤 Ton Mac est éteint, je ne peux pas signer à distance. Signe sur l’appli SoWeSoft, puis réponds *fait*.'); break; }
+        signCode = { code: cmd.url }; // le Mac reconnaît le lien et le traite comme un QR
+        reply(chatId, '📷 Lien transmis à ton Mac, je signe… (quelques secondes)');
         break;
       case 'today': reply(chatId, fullDay(`Aujourd'hui – ${dayLabel(now)}`, coursesToday, new Set(signToday.map((c) => c.id)), isDone).replace(/^🤖\s*/, '')); break;
       case 'tomorrow': { const d = new Date(now.getTime() + 864e5); reply(chatId, fullDay(`Demain – ${dayLabel(d)}`, coursesTomorrow, new Set(signTomorrow.map((c) => c.id)), isDone).replace(/^🤖\s*/, '')); break; }

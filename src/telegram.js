@@ -31,7 +31,7 @@ const COMMANDS = [
  * state.status : off (pas de token) → starting → waiting_link (bot prêt, pas encore relié) → ready
  *                + error (token invalide, autre instance…)
  */
-export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, members = null, onMemberMessage, onMemberLinked, fetchImpl = fetch, pollTimeout = 50 }) {
+export function createTelegram({ dataDir, onMessage, onPhoto = null, onReady, onOwnerLinked, members = null, onMemberMessage, onMemberLinked, fetchImpl = fetch, pollTimeout = 50 }) {
   const file = join(dataDir, 'telegram.json');
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const state = {
@@ -74,6 +74,15 @@ export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, mem
 
   const ASK_PHONE = { reply_markup: { keyboard: [[{ text: '📱 Partager mon numéro', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } };
   const NO_KEYBOARD = { reply_markup: { remove_keyboard: true } };
+
+  /** Télécharge un fichier Telegram (photo…) en mémoire. Refuse au-delà de 8 Mo. */
+  async function downloadFile(fileId) {
+    const info = await call('getFile', { file_id: fileId });
+    if (!info.file_path || (info.file_size || 0) > 8e6) throw new Error('fichier absent ou trop gros');
+    const res = await fetchImpl(`${API}/file/bot${token}/${info.file_path}`, { signal: AbortSignal.timeout(30e3) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
 
   /** Message vers un membre de la classe (par son chat Telegram). */
   async function sendTo(chatId, text) {
@@ -131,6 +140,15 @@ export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, mem
       }
       await sendText(chatId, '✅ Numéro vérifié !', NO_KEYBOARD).catch(() => {});
       return linkMember(member, chatId, name);
+    }
+
+    // Photo (ou image envoyée comme fichier) : seul le propriétaire relié peut m'envoyer un QR code à lire
+    if (!m.text && (m.photo || m.document?.mime_type?.startsWith('image/'))) {
+      if (!state.owner || state.owner.chatId !== chatId || !onPhoto) return;
+      const fileId = m.photo ? m.photo.at(-1).file_id : m.document.file_id; // la plus grande taille
+      const buffer = await downloadFile(fileId).catch((e) => { log.warn(`Telegram : image illisible (${e.message})`); return null; });
+      if (buffer) await onPhoto(buffer);
+      return;
     }
 
     if (!m.text) return;
@@ -245,5 +263,5 @@ export function createTelegram({ dataDir, onMessage, onReady, onOwnerLinked, mem
   const inviteUrl = (member) => (state.username ? `https://t.me/${state.username}?start=${member.inviteCode}` : null);
   const botUrl = () => (state.username ? `https://t.me/${state.username}` : null);
 
-  return { state, send, sendTo, start, stop, unlink, linkUrl, inviteUrl, botUrl, handleUpdate };
+  return { state, send, sendTo, start, stop, unlink, linkUrl, inviteUrl, botUrl, handleUpdate, downloadFile };
 }

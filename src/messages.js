@@ -76,6 +76,7 @@ export const msg = {
   help: (dryRun) =>
     `${BOT_TAG} *Ce que je comprends :*\n` +
     `• *48213* ou *code 48213* → je signe avec ce code\n` +
+    `• une *photo du QR code* ou son *lien* → je le lis et je signe\n` +
     `• *fait* → tu as signé toi-même, j'arrête de te relancer\n` +
     `• *ignore* → pas besoin de signer ce créneau\n` +
     `• *planning* / *demain* / *semaine* → tes créneaux d'autonomie\n` +
@@ -102,6 +103,11 @@ export const msg = {
   signFailed: (reason) =>
     `${BOT_TAG} ❌ Je n'ai pas réussi à signer : ${reason}\n👉 Signe à la main sur l'appli, puis réponds *fait*. Tu peux aussi me renvoyer le code.`,
   signBusy: () => `${BOT_TAG} ⏳ Je suis déjà en train de signer, une seconde…`,
+  signingLink: () => `${BOT_TAG} 📷 QR code lu, je signe… ⏳`,
+  dryRunLink: () => `${BOT_TAG} 🧪 Mode test : QR lu, le pavé de signature est bien là mais je n'ai pas validé.`,
+  linkNeedsCode: () => `${BOT_TAG} 🔢 Ce lien demande un *code à 5 chiffres* : envoie-le-moi et je signe.`,
+  qrNotFound: () => `${BOT_TAG} 🔍 Je ne trouve pas de QR code lisible sur cette image. Recadre-le (QR bien net, bien en face) ou envoie le lien / le code.`,
+  qrUnknown: (text) => `${BOT_TAG} 🤔 QR lu, mais je ne sais pas quoi en faire. Contenu :\n${String(text).slice(0, 200).replace(/[`*_]/g, '')}`,
   autoSigned: (session) => `${BOT_TAG} ✍️ *Signé automatiquement* (cours sans code)${session ? `\n${slot(session)}` : ''}`,
   autoDryRun: (session) => `${BOT_TAG} 🧪 Mode test : ce cours est signable sans code${session ? `\n${slot(session)}` : ''} (je n'ai pas validé).`,
   autoSignFailed: (session, reason) => `${BOT_TAG} ⚠️ Signature auto impossible${session ? ` pour ${slot(session)}` : ''} : ${reason}\n👉 Signe à la main, ou envoie le code si on t'en donne un.`,

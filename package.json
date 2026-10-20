@@ -24,7 +24,10 @@
   "homepage": "https://github.com/camille116/sowesoftAUTO#readme",
   "dependencies": {
     "dotenv": "^18.0.5",
+    "jpeg-js": "^0.4.4",
+    "jsqr": "^1.4.0",
     "node-ical": "^0.27.2",
+    "pngjs": "^7.0.0",
     "puppeteer": "^25.12.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",

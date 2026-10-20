@@ -599,6 +599,55 @@ export class SowesignSigner {
     }
   }
 
+  /**
+   * Signe à partir d'un lien SoWeSoft (typiquement le contenu d'un QR code) : on s'assure d'être
+   * connecté, on ouvre le lien avec cette session, puis on signe si le pavé de signature apparaît.
+   * Renvoie { ok, dryRun?, needsCode?, reason?, screenshot }. Le lien lui-même n'est jamais renvoyé
+   * ni journalisé (il peut contenir un jeton).
+   */
+  async signLink(url) {
+    if (this.busy) return { ok: false, busy: true };
+    this.busy = true;
+    try {
+      return await this.withPage(async (page) => {
+        try {
+          const shot = (name) => this.screenshot(page, name);
+          await this.open(page); // vérifie la session (reconnexion si besoin)
+          await page.goto(url, { waitUntil: 'networkidle2' });
+          await this.closePopups(page, 1500);
+          let state = await this.waitForState(page);
+          if (state === 'login' || state === 'accessDenied') {
+            await this.login(page);
+            await page.goto(url, { waitUntil: 'networkidle2' });
+            await this.closePopups(page, 1500);
+            state = await this.waitForState(page);
+          }
+          if (!state) return { ok: false, reason: 'la page ouverte par ce lien n’est pas reconnue (vérifie la capture)', screenshot: await shot('lien-inconnu') };
+
+          if (state === 'detection') return { ok: false, needsCode: true, screenshot: await shot('code-requis') };
+          const blocked = {
+            noCourse: 'SoWeSoft n’affiche aucun cours en ce moment',
+            nextCourse: 'la signature n’est pas encore ouverte sur SoWeSoft',
+            wrongTime: 'SoWeSoft signale une heure d’appareil incorrecte',
+            accessDenied: 'accès refusé par SoWeSoft',
+            login: 'connexion SoWeSoft refusée',
+          }[state];
+          if (blocked) return { ok: false, reason: blocked, screenshot: await shot(state) };
+
+          if (this.dryRun && state === 'signature') return { ok: true, dryRun: true, screenshot: await shot('dry-run') };
+          const result = await this.finish(page); // dessine la signature si besoin, attend la confirmation
+          return { ...result, screenshot: await shot(result.ok ? 'signe' : 'echec') };
+        } catch (err) {
+          return { ok: false, reason: err.message, screenshot: await this.screenshot(page, 'erreur') };
+        }
+      });
+    } catch (err) {
+      return { ok: false, reason: `navigateur : ${err.message}` };
+    } finally {
+      this.busy = false;
+    }
+  }
+
   /** Vérifie la connexion (et débloque la reconnexion après un échec). */
   async check() {
     this.loginLocked = null;
