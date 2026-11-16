@@ -23,14 +23,14 @@ test('rateFor prend le taux de l’année, sinon le dernier connu', () => {
   assert.equal(rateFor('2024-01-01', settings), 0.22);
 });
 
-// Totaux mensuels de l'Excel d'origine (colonne C.A), hors doublon de juillet 2025.
+// Totaux par mois calculés sur les dates écrites dans l'Excel (quelques lignes y étaient rangées dans un autre onglet).
 const EXCEL_CA = {
-  '2025-05': 240, '2025-06': 45, '2025-07': 90, '2025-09': 425, '2025-10': 767, '2025-12': 1369,
-  '2026-01': 1249.38, '2026-02': 1300, '2026-03': 590, '2026-04': 1175, '2026-05': 1450,
-  '2026-06': 270, '2026-07': 400, '2026-08': 75, '2026-09': 900,
+  '2025-05': 240, '2025-06': 90, '2025-07': 90, '2025-09': 425, '2025-10': 767, '2025-12': 1369,
+  '2026-01': 1249.38, '2026-02': 1300, '2026-03': 1365, '2026-04': 400, '2026-05': 1450,
+  '2026-06': 470, '2026-07': 200, '2026-08': 75, '2026-09': 900,
 };
 
-test('l’historique importé retrouve les totaux mensuels de l’Excel', () => {
+test('l’historique importé donne les totaux mensuels attendus', () => {
   const months = byMonth(seedEntries(), settings);
   assert.deepEqual([...months.keys()].sort(), Object.keys(EXCEL_CA).sort());
   for (const [k, ca] of Object.entries(EXCEL_CA)) assert.equal(months.get(k).ca, Math.round(ca * 100), k);
@@ -38,8 +38,8 @@ test('l’historique importé retrouve les totaux mensuels de l’Excel', () => 
 
 test('l’impayé Hooked ne compte pas dans le CA', () => {
   const june = seedEntries().filter((e) => e.date.startsWith('2025-06'));
-  assert.equal(june.length, 2);
-  assert.equal(totals(june, settings).ca, 4500);
+  assert.equal(june.length, 3);
+  assert.equal(totals(june, settings).ca, 9000);
 });
 
 test('les cotisations portent sur le montant déclaré', () => {

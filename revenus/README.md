@@ -38,7 +38,7 @@ Sans serveur, la session Google dure une heure ; l'app tente de la renouveler se
 
 ## Historique importé
 
-Au premier lancement, l'app charge l'historique de l'ancien fichier Excel (`js/seed.js`). Les lignes ambiguës portent l'étiquette « À vérifier » avec la raison en note. Les liens de factures n'étaient pas lisibles dans l'export PDF et sont à recoller.
+Au premier lancement, l'app charge l'historique de l'ancien fichier Excel (`js/seed.js`). Les dates et les clients sont repris tels qu'écrits dans l'Excel. Les liens de factures n'étaient pas lisibles dans l'export PDF et sont à recoller.
 
 ## Tests
 
