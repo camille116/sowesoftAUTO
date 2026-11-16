@@ -16,7 +16,7 @@ Ouvre ensuite l'adresse affichée. Pour une mise en ligne, publie le dossier `re
 - **Aperçu** : encaissé du mois et de l'année (comparés à la même durée de la période précédente), cotisations estimées du trimestre, paiements à encaisser, graphique mensuel, répartition par client et par prestation.
 - **Paiements** : une ligne par encaissement, regroupée par mois, avec recherche et filtres (payés, en attente, impayés, à vérifier).
 - **Saisie** : montant, client, date, prestation, projet, statut ; en option client final, tranche (1/2, 2/2), montant déclaré, lien de facture, notes. Le champ « Solde restant à encaisser » crée d'un coup la ligne en attente du solde.
-- **Exports** : CSV (séparateur `;`, décimales à virgule) et Excel (`Paiements` + totaux par `Mois`).
+- **Exports** : CSV (séparateur `;`, décimales à virgule), Excel (`Paiements` + totaux par `Mois`) et sauvegarde JSON réimportable.
 - **Google Drive** : à chaque modification, `Revenus.xlsx` est remplacé dans le Drive, avec `revenus-donnees.json` pour synchroniser plusieurs appareils.
 
 ## Règles de calcul
@@ -36,9 +36,9 @@ Ouvre ensuite l'adresse affichée. Pour une mise en ligne, publie le dossier `re
 L'app demande la portée `drive.file` : elle ne voit que les fichiers qu'elle a créés.
 Sans serveur, la session Google dure une heure ; l'app tente de la renouveler seule, sinon la pastille « Reconnecter Drive » demande un clic. Entre-temps, rien n'est perdu : les données restent dans le navigateur.
 
-## Historique importé
+## Sauvegarde et import
 
-Au premier lancement, l'app charge l'historique de l'ancien fichier Excel (`js/seed.js`). Les dates et les clients sont repris tels qu'écrits dans l'Excel. Les liens de factures n'étaient pas lisibles dans l'export PDF et sont à recoller.
+Réglages → Données : « Exporter une sauvegarde » produit un fichier JSON, « Importer une sauvegarde » le fusionne avec l'existant (la version la plus récente de chaque ligne gagne). C'est aussi le moyen de charger un historique : aucune donnée personnelle n'est stockée dans ce dépôt.
 
 ## Tests
 
@@ -55,5 +55,4 @@ node --test "revenus/test/*.test.js"
 | `js/export.js` | CSV et classeur Excel |
 | `js/drive.js` | Connexion Google et envoi des fichiers |
 | `js/app.js` | Interface |
-| `js/seed.js` | Historique repris de l'Excel |
 | `vendor/exceljs.min.js` | ExcelJS 4.4.0 (licence MIT) |

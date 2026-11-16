@@ -5,15 +5,10 @@ import {
   inQuarter, live, monthKey, monthRange, paid, parseAmount, quarterKey, rateFor, receivables, todayISO, totals, yearOf,
 } from './calc.js';
 import * as store from './store.js';
-import { seedEntries } from './seed.js';
 import { XLSX_MIME, download, toCSV, toXLSX } from './export.js';
 import * as drive from './drive.js';
 
 let state = store.load();
-if (!state.seeded) {
-  state = { ...state, entries: [...state.entries, ...seedEntries()], seeded: true };
-  store.save(state);
-}
 
 const ui = { range: 'last12', status: 'all', query: '', month: '' };
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -345,11 +340,13 @@ function renderSettings() {
       </section>
 
       <section class="panel">
-        <h2>Exports</h2>
-        <p>Le CSV s’ouvre directement dans Excel ou Google Sheets. Le fichier Excel contient un onglet par paiement et un onglet de totaux mensuels.</p>
+        <h2>Données</h2>
+        <p>Le CSV s’ouvre directement dans Excel ou Google Sheets. Le fichier Excel contient un onglet par paiement et un onglet de totaux mensuels. La sauvegarde est un fichier à réimporter ici, sur cet appareil ou un autre.</p>
         <div class="inline">
           <button type="button" class="btn btn-quiet" data-export="csv">Exporter en CSV</button>
           <button type="button" class="btn btn-quiet" data-export="xlsx">Exporter en Excel</button>
+          <button type="button" class="btn btn-quiet" data-export="json">Exporter une sauvegarde</button>
+          <label class="btn btn-quiet">Importer une sauvegarde<input type="file" id="import" accept="application/json,.json" hidden></label>
         </div>
       </section>
     </div>`;
@@ -487,8 +484,9 @@ async function runExport(kind) {
   const stamp = todayISO();
   try {
     if (kind === 'csv') download(`revenus-${stamp}.csv`, toCSV(state.entries), 'text/csv;charset=utf-8');
+    else if (kind === 'json') download(`revenus-sauvegarde-${stamp}.json`, JSON.stringify(store.exportableState(state)), 'application/json');
     else download(`revenus-${stamp}.xlsx`, new Blob([await toXLSX(state)], { type: XLSX_MIME }));
-    toast(kind === 'csv' ? 'CSV exporté' : 'Fichier Excel exporté');
+    toast({ csv: 'CSV exporté', json: 'Sauvegarde exportée', xlsx: 'Fichier Excel exporté' }[kind]);
   } catch (err) {
     console.error(err);
     toast('Export impossible. Recharge la page puis réessaie.');
@@ -599,6 +597,21 @@ document.addEventListener('click', (ev) => {
     sheet.close();
     commit(store.deleteEntry(state, id));
     toast('Paiement supprimé', { label: 'Annuler', run: () => commit(store.restoreEntry(state, id)) });
+  }
+});
+
+// Import d'une sauvegarde : fusionnée avec l'existant, la version la plus récente de chaque ligne gagne.
+document.addEventListener('change', async (ev) => {
+  if (ev.target.id !== 'import' || !ev.target.files[0]) return;
+  try {
+    const incoming = store.sanitizeState(JSON.parse(await ev.target.files[0].text()));
+    if (!incoming.entries.length) { toast('Ce fichier ne contient aucun paiement lisible.'); return; }
+    const before = live(state.entries).length;
+    commit(store.mergeStates(state, incoming));
+    const added = live(state.entries).length - before;
+    toast(added > 0 ? `${added} paiement${added > 1 ? 's' : ''} importé${added > 1 ? 's' : ''}` : 'Sauvegarde importée, rien de nouveau');
+  } catch {
+    toast('Fichier illisible : choisis une sauvegarde exportée depuis cette app.');
   }
 });
 

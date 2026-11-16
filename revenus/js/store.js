@@ -26,10 +26,18 @@ export function load() {
     const raw = storage.get(KEY);
     if (!raw) return emptyState();
     const s = JSON.parse(raw);
+    const clean = sanitizeState(s);
+    const stored = s && typeof s.settings === 'object' && s.settings ? s.settings : {};
     return {
-      entries: Array.isArray(s.entries) ? s.entries : [],
-      settings: { ...DEFAULT_SETTINGS, ...(s.settings || {}), rates: { ...DEFAULT_SETTINGS.rates, ...(s.settings?.rates || {}) } },
-      seeded: Boolean(s.seeded),
+      entries: clean.entries,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        rates: Object.keys(clean.settings.rates).length ? clean.settings.rates : { ...DEFAULT_SETTINGS.rates },
+        driveClientId: typeof stored.driveClientId === 'string' ? stored.driveClientId.slice(0, 200) : '',
+        driveAuto: stored.driveAuto !== false,
+        updatedAt: clean.settings.updatedAt,
+      },
+      seeded: clean.seeded,
     };
   } catch {
     return emptyState();
@@ -92,12 +100,81 @@ export function updateSettings(state, patch, now = new Date().toISOString()) {
   return { ...state, settings: { ...state.settings, ...patch, updatedAt: now } };
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const EPOCH = '1970-01-01T00:00:00.000Z';
+const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+const httpUrl = (v) => (/^https?:\/\//i.test(str(v, 2000)) ? str(v, 2000) : '');
+
+/** Horodatage ISO valide ; une date dans le futur est ramenée à maintenant (sinon elle gagnerait toutes les fusions). */
+function stamp(v, now) {
+  if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return EPOCH;
+  const iso = new Date(v).toISOString();
+  return iso > now ? now : iso;
+}
+
+/**
+ * Remet une ligne venue de l'extérieur (Drive, fichier importé, stockage ancien) dans la forme attendue.
+ * Renvoie null si elle est inutilisable. Rien de ce qui sort d'ici n'est autre chose qu'un texte borné,
+ * un entier ou un booléen : l'affichage et l'export peuvent s'y fier.
+ */
+export function sanitizeEntry(raw, now = new Date().toISOString()) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = str(raw.id, 80);
+  const date = str(raw.date, 10);
+  if (!id || !ISO_DATE.test(date) || Number.isNaN(Date.parse(date))) return null;
+  if (!Number.isInteger(raw.amount) || raw.amount <= 0 || raw.amount > 1e11) return null;
+  const declared = Number.isInteger(raw.declared) && raw.declared >= 0 && raw.declared < raw.amount ? raw.declared : null;
+  return {
+    id,
+    date,
+    client: str(raw.client, 200).trim() || '—',
+    endClient: str(raw.endClient, 200),
+    type: str(raw.type, 200),
+    project: str(raw.project, 200),
+    amount: raw.amount,
+    declared,
+    status: Object.values(STATUS).includes(raw.status) ? raw.status : STATUS.PAID,
+    installment: str(raw.installment, 20),
+    invoiceUrl: httpUrl(raw.invoiceUrl),
+    notes: str(raw.notes, 2000),
+    review: raw.review === true,
+    createdAt: stamp(raw.createdAt, now),
+    updatedAt: stamp(raw.updatedAt, now),
+    deleted: raw.deleted === true,
+  };
+}
+
+/** Taux par année : clés AAAA, valeurs entre 0 et 100. */
+export function sanitizeRates(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [y, v] of Object.entries(raw)) {
+    if (/^\d{4}$/.test(y) && typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100) out[y] = v;
+  }
+  return out;
+}
+
+const MAX_ENTRIES = 20000;
+
+/** État venu de l'extérieur, nettoyé. Ne lève jamais d'erreur. */
+export function sanitizeState(raw, now = new Date().toISOString()) {
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const entries = (Array.isArray(src.entries) ? src.entries.slice(0, MAX_ENTRIES) : []).map((e) => sanitizeEntry(e, now)).filter(Boolean);
+  const rates = sanitizeRates(src.settings?.rates);
+  return {
+    entries,
+    settings: { rates, updatedAt: Object.keys(rates).length ? stamp(src.settings?.updatedAt, now) : EPOCH },
+    seeded: src.seeded === true,
+  };
+}
+
 /**
  * Fusionne l'état local et l'état distant (Drive) : pour chaque ligne, la version
  * modifiée le plus récemment gagne. Idem pour les réglages (hors identifiant Google, propre à l'appareil).
  */
-export function mergeStates(local, remote) {
-  if (!remote) return local;
+export function mergeStates(local, remoteRaw) {
+  if (!remoteRaw) return local;
+  const remote = sanitizeState(remoteRaw);
   const map = new Map();
   for (const e of local.entries) map.set(e.id, e);
   for (const e of remote.entries || []) {
