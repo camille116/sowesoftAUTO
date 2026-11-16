@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+  <title>Revenus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230d0d0d'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23f7f5f3'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/" aria-label="Revenus, aperçu"><span class="brand-mark" aria-hidden="true"></span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#/" data-route="overview">Aperçu</a>
+      <a href="#/paiements" data-route="payments">Paiements</a>
+      <a href="#/reglages" data-route="settings">Réglages</a>
+    </nav>
+    <div class="top-actions">
+      <button type="button" class="sync" id="sync" hidden></button>
+      <button type="button" class="btn btn-primary" id="add">Ajouter un paiement</button>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <dialog id="sheet" class="sheet" aria-labelledby="sheet-title"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="vendor/exceljs.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
