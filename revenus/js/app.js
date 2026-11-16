@@ -23,6 +23,22 @@ const sheet = $('#sheet');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const inputAmount = (cents) => (cents == null ? '' : (cents / 100).toFixed(cents % 100 ? 2 : 0).replace('.', ','));
 
+const svg = (d) => `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  calendar: svg('<rect x="2.5" y="3.5" width="11" height="10" rx="2.5"/><path d="M2.5 7h11M5.5 2v3M10.5 2v3"/>'),
+  percent: svg('<path d="M12.5 3.5l-9 9"/><circle cx="4.5" cy="4.5" r="1.7"/><circle cx="11.5" cy="11.5" r="1.7"/>'),
+  clock: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2 1.3"/>'),
+  arrow: svg('<path d="M5 11l6-6M6 5h5v5"/>'),
+};
+
+/** Pastille dégradée propre à chaque client : la couleur vient du nom, toujours la même. */
+function orb(name) {
+  let h = 0;
+  for (const c of String(name)) h = (h * 31 + c.codePointAt(0)) % 360;
+  h = (h * 137) % 360;
+  return `<span class="orb" aria-hidden="true" style="--a:hsl(${h} 92% 74%);--b:hsl(${(h + 48) % 360} 88% 62%);--c:hsl(${(h + 300) % 360} 85% 70%)"></span>`;
+}
+
 // ---------- Changement d'état ----------
 
 function commit(next, { sync = true } = {}) {
@@ -93,13 +109,13 @@ function renderOverview() {
     </a>`;
   }).join('');
 
-  const rank = (rows) => rows.length
-    ? `<ol class="rank">${rows.slice(0, 6).map((r) => `<li style="--share:${r.share.toFixed(4)}"><span>${esc(r.name)}</span><span>${fmtEUR(r.amount)}<em>${Math.round(r.share * 100)} %</em></span></li>`).join('')}</ol>`
+  const rank = (rows, withOrb = false) => rows.length
+    ? `<ol class="rank">${rows.slice(0, 6).map((r) => `<li style="--share:${r.share.toFixed(4)}"><span>${withOrb ? orb(r.name) : ''}${esc(r.name)}</span><span>${fmtEUR(r.amount)}<em>${Math.round(r.share * 100)} %</em></span></li>`).join('')}</ol>`
     : '<p class="empty">Aucun paiement sur cette période.</p>';
 
   const dueList = due.length
     ? `<ul class="due">${due.map((e) => `<li>
-        <div><div class="due-who">${esc(e.client)}</div><div class="due-what">${esc([e.project || e.type, e.installment].filter(Boolean).join(' · '))}</div></div>
+        <div><div class="due-who">${orb(e.client)}${esc(e.client)}</div><div class="due-what">${esc([e.project || e.type, e.installment].filter(Boolean).join(' · '))}</div></div>
         <div class="due-amount">${fmtEUR(e.amount)}</div>
         <div class="due-act">
           <span class="chip ${e.late ? 'chip-alert' : ''}">${e.late ? 'En retard, prévu le' : 'Prévu le'} ${fmtDateShort(e.date)}</span>
@@ -107,24 +123,50 @@ function renderOverview() {
         </div></li>`).join('')}</ul>`
     : '<p class="empty">Rien à encaisser. Ajoute un paiement « En attente » pour suivre un solde ou une facture envoyée.</p>';
 
+  // Mini-graphiques des cartes : chaque trait porte une information (mois, part déclarée, part en retard).
+  const yearMonths = monthRange(`${year}-01`, `${year}-12`);
+  const yearMax = Math.max(1, ...yearMonths.map((k) => months.get(k)?.ca ?? 0));
+  const spark = `<div class="spark" aria-hidden="true">${yearMonths.map((k) => `<i style="--f:${((months.get(k)?.ca ?? 0) / yearMax).toFixed(3)}" ${k > thisMonth ? 'data-future' : ''}></i>`).join('')}</div>`;
+  const ticks = (share, alert = false) => {
+    const on = Math.round(Math.min(1, Math.max(0, share)) * 36);
+    return `<div class="ticks ${alert ? 'ticks-alert' : ''}" aria-hidden="true">${Array.from({ length: 36 }, (_, i) => `<i ${i < on ? 'data-on' : ''}></i>`).join('')}</div>`;
+  };
+  const lateTotal = due.filter((e) => e.late).reduce((sum, e) => sum + e.amount, 0);
+  const go = (href, label, attrs = '') => `<a class="kpi-go" href="${href}" ${attrs} aria-label="${label}">${ICON.arrow}</a>`;
+
   view.innerHTML = `
-    <div class="page-head">
-      <div><h1 class="page-title"><small>Encaissé en ${esc(fmtMonth(thisMonth))}</small>${fmtEUR(caMonth)}</h1>
-        <p class="kpi-base"><b>${fmtEUR(caPrevSame)}</b> au ${Number(day)} ${esc(fmtMonth(prevMonth, { short: true, year: false }))}</p></div>
-      <div class="seg" role="group" aria-label="Période">
+    <section class="hero">
+      <div class="hero-art" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="seg hero-seg" role="group" aria-label="Période">
         <button type="button" data-range="last12" aria-pressed="${ui.range === 'last12'}">12 mois</button>
         ${years.map((y) => `<button type="button" data-range="${y}" aria-pressed="${ui.range === y}">${y}</button>`).join('')}
       </div>
-    </div>
+      <div class="hero-card">
+        <p class="hero-label">Encaissé en ${esc(fmtMonth(thisMonth))}</p>
+        <h1 class="hero-value">${fmtEUR(caMonth)}</h1>
+        <p class="kpi-base"><b>${fmtEUR(caPrevSame)}</b> au ${Number(day)} ${esc(fmtMonth(prevMonth, { short: true, year: false }))}</p>
+      </div>
+    </section>
 
     <section class="kpis" aria-label="Chiffres clés">
-      <div class="kpi"><div class="kpi-label">Année ${year}</div><div class="kpi-value">${fmtEUR(caYear)}</div>
-        <div class="kpi-base"><b>${fmtEUR(caLastYearSame)}</b> à la même date en ${lastYear}</div></div>
+      <div class="kpi">
+        <div class="kpi-head"><span class="kpi-label">${ICON.calendar}Année ${year}</span>${go('#/paiements', 'Voir les paiements')}</div>
+        <div class="kpi-value">${fmtEUR(caYear)}</div>
+        <div class="kpi-base"><b>${fmtEUR(caLastYearSame)}</b> à la même date en ${lastYear}</div>
+        ${spark}
+      </div>
       <div class="kpi" title="Estimation : montant déclaré × taux réglé pour l'année. Trimestre ${esc(q.replace('-', ' '))}.">
-        <div class="kpi-label">Cotisations du trimestre</div><div class="kpi-value">${fmtEUR(tq.cotis)}</div>
-        <div class="kpi-base">estimées sur <b>${fmtEUR(tq.declared)}</b> déclarés</div></div>
-      <div class="kpi"><div class="kpi-label">À encaisser</div><div class="kpi-value">${due.length ? fmtEUR(dueTotal) : '—'}</div>
-        <div class="kpi-base">${lateCount ? `<span class="warn">${lateCount} en retard</span>` : `${due.length} paiement${due.length > 1 ? 's' : ''} attendu${due.length > 1 ? 's' : ''}`}</div></div>
+        <div class="kpi-head"><span class="kpi-label">${ICON.percent}Cotisations du trimestre</span>${go('#/reglages', 'Régler les taux')}</div>
+        <div class="kpi-value">${fmtEUR(tq.cotis)}</div>
+        <div class="kpi-base">estimées sur <b>${fmtEUR(tq.declared)}</b> déclarés</div>
+        ${ticks(tq.ca ? tq.declared / tq.ca : 0)}
+      </div>
+      <div class="kpi">
+        <div class="kpi-head"><span class="kpi-label">${ICON.clock}À encaisser</span>${go('#/paiements', 'Voir les paiements en attente', 'data-pending')}</div>
+        <div class="kpi-value">${due.length ? fmtEUR(dueTotal) : '—'}</div>
+        <div class="kpi-base">${lateCount ? `<span class="warn">${lateCount} en retard</span>` : `${due.length} paiement${due.length > 1 ? 's' : ''} attendu${due.length > 1 ? 's' : ''}`}</div>
+        ${ticks(dueTotal ? lateTotal / dueTotal : 0, true)}
+      </div>
     </section>
 
     <div class="grid-2">
@@ -139,7 +181,7 @@ function renderOverview() {
     </div>
 
     <div class="grid-eq">
-      <section class="panel"><div class="panel-head"><h2>Clients</h2><span>${ui.range === 'last12' ? '12 derniers mois' : ui.range}</span></div>${rank(breakdown(inRange, (e) => e.client))}</section>
+      <section class="panel"><div class="panel-head"><h2>Clients</h2><span>${ui.range === 'last12' ? '12 derniers mois' : ui.range}</span></div>${rank(breakdown(inRange, (e) => e.client), true)}</section>
       <section class="panel"><div class="panel-head"><h2>Prestations</h2><span>${ui.range === 'last12' ? '12 derniers mois' : ui.range}</span></div>${rank(breakdown(inRange, (e) => e.type))}</section>
     </div>`;
 }
@@ -167,7 +209,7 @@ function rowHTML(e) {
   if (e.review) tags.push('<span class="chip chip-alert">À vérifier</span>');
   return `<button type="button" class="row" data-edit="${esc(e.id)}" data-status="${e.status}">
     <span class="row-date">${fmtDateShort(e.date)}</span>
-    <span class="row-client">${esc(e.client)}${e.endClient ? `<em>${esc(e.endClient)}</em>` : ''}</span>
+    <span class="row-client">${orb(e.client)}${esc(e.client)}${e.endClient ? `<em>${esc(e.endClient)}</em>` : ''}</span>
     <span class="row-what">${esc([e.type, e.project].filter(Boolean).join(' · '))}</span>
     <span class="row-tags">${tags.join('')}</span>
     <span class="row-amount">${fmtEUR(e.amount)}</span>
@@ -488,11 +530,12 @@ $('#sync').addEventListener('click', () => runSync({ interactive: true }));
 window.addEventListener('hashchange', () => { delete view.dataset.route; render(); window.scrollTo(0, 0); });
 
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('[data-range],[data-month],[data-review],[data-mark-paid],[data-edit],[data-filter],[data-clear-month],[data-export],[data-add-year],[data-drive-off],[data-close],[data-delete]');
+  const t = ev.target.closest('[data-range],[data-month],[data-review],[data-pending],[data-mark-paid],[data-edit],[data-filter],[data-clear-month],[data-export],[data-add-year],[data-drive-off],[data-close],[data-delete]');
   if (!t) return;
   const d = t.dataset;
   if (d.range) { ui.range = d.range; renderOverview(); }
   else if (d.month) { ui.month = d.month; ui.status = 'all'; ui.query = ''; }
+  else if ('pending' in d) { ui.month = ''; ui.status = 'pending'; ui.query = ''; }
   else if ('review' in d) { ui.month = ''; ui.status = 'review'; ui.query = ''; }
   else if (d.markPaid) {
     const id = d.markPaid;
