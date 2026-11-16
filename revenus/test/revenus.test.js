@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { byMonth, monthRange, parseAmount, rateFor, receivables, totals, breakdown, fmtEUR } from '../js/calc.js';
+import { addDays, byMonth, isRealDate, monthRange, parseAmount, rateFor, receivables, totals, breakdown, fmtEUR } from '../js/calc.js';
 import * as store from '../js/store.js';
 import { toCSV, toXLSX } from '../js/export.js';
 
@@ -11,7 +11,7 @@ const settings = { rates: { 2025: 22, 2026: 24 } };
 // Jeu de données inventé : aucun client ni montant réel.
 const row = (id, date, client, type, euros, status = 'paid', declared = null, extra = {}) => ({
   id, date, client, endClient: '', type, project: '', amount: Math.round(euros * 100), status,
-  declared: declared == null ? null : Math.round(declared * 100), installment: '', invoiceUrl: '', notes: '', review: false,
+  declared: declared == null ? null : Math.round(declared * 100), installment: '', invoiceUrl: '', videoUrl: '', notes: '', review: false,
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', deleted: false, ...extra,
 });
 const sample = () => [
@@ -31,6 +31,29 @@ test('parseAmount lit les formats français', () => {
   assert.equal(parseAmount('59.38'), 5938);
   assert.equal(parseAmount('700eur jamais payé'), null);
   assert.equal(parseAmount(''), null);
+  // Deux séparateurs : le dernier est celui des décimales.
+  assert.equal(parseAmount('1.200,50'), 120050);
+  assert.equal(parseAmount('1,200.50'), 120050);
+  assert.equal(parseAmount('12.345.678,9'), 1234567890);
+  assert.equal(parseAmount('1.20,50'), null);
+  assert.equal(parseAmount('12,345'), null);
+  // Pas d'erreur d'arrondi, pas de nombre démesuré.
+  assert.equal(parseAmount('1,15'), 115);
+  assert.equal(parseAmount('8,2'), 820);
+  assert.equal(parseAmount('99999999999999999999'), null);
+  assert.equal(parseAmount('-5'), null);
+});
+
+test('isRealDate refuse les dates qui n’existent pas', () => {
+  assert.equal(isRealDate('2026-02-28'), true);
+  assert.equal(isRealDate('2028-02-29'), true);
+  assert.equal(isRealDate('2026-02-30'), false);
+  assert.equal(isRealDate('2026-04-31'), false);
+  assert.equal(isRealDate('0202-01-01'), false);
+  assert.equal(isRealDate('2026-1-1'), false);
+  assert.equal(isRealDate(20260101), false);
+  assert.equal(addDays('2026-12-15', 30), '2027-01-14');
+  assert.equal(addDays('2028-02-28', 1), '2028-02-29');
 });
 
 test('rateFor prend le taux de l’année, sinon le dernier connu', () => {
@@ -88,6 +111,19 @@ test('normalizeEntry valide la saisie', () => {
   assert.equal(ok.entry.status, 'paid');
   assert.ok(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: 100, declared: 200 }).errors.declared);
   assert.ok(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: 100, invoiceUrl: 'javascript:alert(1)' }).errors.invoiceUrl);
+  assert.ok(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: 100, videoUrl: 'javascript:alert(1)' }).errors.videoUrl);
+  assert.ok(store.normalizeEntry({ date: '2026-02-30', client: 'A', amount: 100 }).errors.date);
+  assert.ok(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: 100_000_000_01 }).errors.amount);
+
+  // Saisie en texte, comme dans le formulaire.
+  const typed = store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: '1 200,50', declared: '', videoUrl: ' https://drive.google.com/file/d/x/view ' });
+  assert.equal(typed.entry.amount, 120050);
+  assert.equal(typed.entry.declared, null);
+  assert.equal(typed.entry.videoUrl, 'https://drive.google.com/file/d/x/view');
+  assert.equal(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: '12,345' }).errors.amount, 'Montant illisible. Exemple : 1200,50');
+  assert.equal(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: '  ' }).errors.amount, 'Indique le montant.');
+  assert.equal(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: '100', declared: '0' }).entry.declared, 0);
+  assert.ok(store.normalizeEntry({ date: '2026-11-16', client: 'A', amount: '100', declared: 'abc' }).errors.declared);
 });
 
 test('ajout, modification, suppression et restauration', () => {
@@ -102,6 +138,27 @@ test('ajout, modification, suppression et restauration', () => {
   assert.equal(totals(s.entries, settings).ca, 250);
 });
 
+test('une modification faite avec une horloge en retard reste plus récente que la version précédente', () => {
+  // L'autre appareil avance d'une heure : sa version est datée 11:00 alors qu'il est 10:10 ici.
+  let s = { ...store.emptyState(), entries: [{ ...row('x', '2026-01-01', 'A', 'T', 100), updatedAt: '2026-11-16T11:00:00.000Z' }] };
+  s = store.updateEntry(s, 'x', { amount: 25000 }, '2026-11-16T10:10:00.000Z');
+  assert.equal(s.entries[0].updatedAt, '2026-11-16T11:00:00.001Z');
+  const other = { entries: [{ ...row('x', '2026-01-01', 'A', 'T', 100), updatedAt: '2026-11-16T11:00:00.000Z' }] };
+  assert.equal(store.mergeStates(s, other).entries[0].amount, 25000);
+  // Idem pour les taux.
+  const rated = store.updateRates({ ...s, settings: { ...s.settings, updatedAt: '2026-11-16T11:00:00.000Z' } }, { 2026: 30 }, '2026-11-16T10:10:00.000Z');
+  assert.equal(rated.settings.updatedAt, '2026-11-16T11:00:00.001Z');
+});
+
+test('deux onglets : fusionner avec ce qui est déjà enregistré ne perd aucune ligne', () => {
+  const base = store.emptyState();
+  const tabA = store.addEntry(base, row('ignored', '2026-11-01', 'A', 'T', 1), '2026-11-16T10:00:00.000Z');
+  const tabB = store.addEntry(base, row('ignored', '2026-11-02', 'B', 'T', 2), '2026-11-16T10:01:00.000Z');
+  // L'onglet B enregistre après A : il fusionne avec l'état sur l'appareil (celui de A) avant d'écrire.
+  const saved = store.mergeStates(tabB, tabA);
+  assert.deepEqual(saved.entries.map((e) => e.client).sort(), ['A', 'B']);
+});
+
 test('mergeStates garde la version la plus récente de chaque ligne', () => {
   const base = row('x', '2026-01-01', 'A', 'T', 1);
   const local = { ...store.emptyState(), entries: [{ ...base, updatedAt: '2026-01-02T00:00:00.000Z' }, { ...base, id: 'local-only' }] };
@@ -114,40 +171,70 @@ test('mergeStates garde la version la plus récente de chaque ligne', () => {
   assert.equal(m.entries.length, 3);
   assert.equal(m.entries.find((e) => e.id === 'x').amount, 999);
   assert.equal(m.entries.find((e) => e.id === 'local-only').deleted, false);
-  assert.deepEqual(m.settings.rates, { 2026: 30 });
+  // Les taux distants, plus récents, l'emportent ; une année connue d'un seul côté est gardée.
+  assert.deepEqual(m.settings.rates, { 2025: 24.8, 2026: 30 });
   assert.equal(m.settings.driveClientId, 'mine');
   assert.equal(store.mergeStates(local, null), local);
   assert.equal(store.exportableState(local).settings.driveClientId, undefined);
 });
 
 test('les données venues de l’extérieur sont nettoyées avant fusion', () => {
-  const now = '2026-11-16T10:00:00.000Z';
   const evil = '"><img src=x onerror=alert(1)>';
-  assert.equal(store.sanitizeEntry({ ...row('a', '2026-01-01', 'A', 'T', 1), date: [evil] }, now), null);
-  assert.equal(store.sanitizeEntry({ ...row('a', '2026-01-01', 'A', 'T', 1), date: 5 }, now), null);
-  assert.equal(store.sanitizeEntry({ ...row('a', '2026-01-01', 'A', 'T', 1), amount: '100' }, now), null);
-  assert.equal(store.sanitizeEntry(null, now), null);
+  const ok = row('a', '2026-01-01', 'A', 'T', 1);
+  assert.equal(store.sanitizeEntry({ ...ok, date: [evil] }), null);
+  assert.equal(store.sanitizeEntry({ ...ok, date: 5 }), null);
+  assert.equal(store.sanitizeEntry({ ...ok, date: '2026-02-30' }), null);
+  assert.equal(store.sanitizeEntry({ ...ok, amount: '100' }), null);
+  assert.equal(store.sanitizeEntry({ ...ok, amount: 1e22 }), null);
+  assert.equal(store.sanitizeEntry({ ...ok, id: { toString: () => 'x' } }), null);
+  assert.equal(store.sanitizeEntry(null), null);
   const e = store.sanitizeEntry({
-    ...row('a', '2026-01-01', 'A', 'T', 1), status: evil, client: { formula: '1+1' }, invoiceUrl: 'javascript:alert(1)',
-    notes: 'x'.repeat(5000), updatedAt: '9999-01-01T00:00:00.000Z', createdAt: 42, deleted: 'yes', extra: 'ignored',
-  }, now);
+    ...ok, status: evil, client: { formula: '1+1' }, invoiceUrl: 'javascript:alert(1)', videoUrl: 'data:text/html,x',
+    notes: 'x'.repeat(5000), updatedAt: '+275760-09-13T00:00:00.000Z', createdAt: 42, deleted: 'yes', extra: 'ignored',
+  });
   assert.equal(e.status, 'paid');
   assert.equal(e.client, '—');
   assert.equal(e.invoiceUrl, '');
+  assert.equal(e.videoUrl, '');
   assert.equal(e.notes.length, 2000);
-  assert.equal(e.updatedAt, now);
+  assert.equal(e.updatedAt, '9000-01-01T00:00:00.000Z');
   assert.equal(e.createdAt, '1970-01-01T00:00:00.000Z');
   assert.equal(e.deleted, false);
   assert.equal('extra' in e, false);
   assert.deepEqual(store.sanitizeRates({ 2026: 25.8, [evil]: 1, 2027: '30', 2028: 400 }), { 2026: 25.8 });
-  for (const junk of [null, 5, 'x', [], { entries: 'no' }, { entries: [1, null, {}] }]) assert.deepEqual(store.sanitizeState(junk, now).entries, []);
+  for (const junk of [null, 5, 'x', [], { entries: 'no' }, { entries: [1, null, {}] }]) assert.deepEqual(store.sanitizeState(junk).entries, []);
+  // Deux lignes avec le même identifiant : une seule est gardée.
+  assert.equal(store.sanitizeState({ entries: [ok, { ...ok, amount: 999 }] }).entries.length, 1);
 
-  // Une ligne supprimée à distance avec une date future ne doit pas verrouiller la ligne pour toujours.
-  const local = { ...store.emptyState(), entries: [row('a', '2026-01-01', 'A', 'T', 1)] };
-  const merged = store.mergeStates(local, { entries: [{ ...row('a', '2026-01-01', 'A', 'T', 1), deleted: true, updatedAt: '9999-01-01T00:00:00.000Z' }] });
-  assert.ok(merged.entries[0].updatedAt < '9999');
+  // Une ligne supprimée à distance avec une date absurde ne verrouille pas la ligne : la restaurer ici l'emporte.
+  const local = { ...store.emptyState(), entries: [ok] };
+  const far = { entries: [{ ...ok, deleted: true, updatedAt: '9999-12-31T23:59:59.999Z' }] };
+  const merged = store.mergeStates(local, far);
+  assert.equal(merged.entries[0].deleted, true);
+  const restored = store.restoreEntry(merged, 'a');
+  assert.equal(store.mergeStates(restored, far).entries[0].deleted, false);
   // Des taux distants invalides ne remplacent pas les taux locaux.
   assert.deepEqual(store.mergeStates(local, { entries: [], settings: { rates: { [evil]: 1 }, updatedAt: '2099-01-01T00:00:00.000Z' } }).settings.rates, local.settings.rates);
+});
+
+test('exportableState ne dépend pas de l’ordre des lignes', () => {
+  const a = { ...store.emptyState(), entries: sample() };
+  const b = { ...store.emptyState(), entries: sample().reverse() };
+  assert.equal(store.sameData(a, b), true);
+  assert.equal(store.sameData(a, store.updateEntry(a, 'a1', { amount: 1 })), false);
+  assert.equal(store.sameData(store.sanitizeState(JSON.parse(JSON.stringify(store.exportableState(a)))), a), true);
+});
+
+test('suggestions et dernière ligne d’un client', () => {
+  const s = { ...store.emptyState(), entries: [
+    { ...row('p1', '2026-01-01', 'Agence Orme', 'Motion design', 1), project: 'Film A', videoUrl: 'https://example.com/a' },
+    { ...row('p2', '2026-03-01', 'Agence Orme', 'Montage', 1), project: 'Film B' },
+    { ...row('p3', '2026-02-01', 'Studio Kite', 'Short', 1), project: 'Film C' },
+  ] };
+  assert.equal(store.latestFor(s, ' agence orme ').type, 'Montage');
+  assert.equal(store.latestFor(s, 'Agence Orme', 'film a').videoUrl, 'https://example.com/a');
+  assert.equal(store.latestFor(s, 'Inconnu'), null);
+  assert.deepEqual(store.suggestions(s, 'project', (e) => e.client === 'Agence Orme'), ['Film A', 'Film B']);
 });
 
 test('toCSV : séparateur ;, décimales à virgule, formules neutralisées', () => {
@@ -159,7 +246,7 @@ test('toCSV : séparateur ;, décimales à virgule, formules neutralisées', () 
   const lines = csv.trim().split('\r\n');
   assert.ok(csv.startsWith('﻿'));
   assert.equal(lines.length, 3);
-  assert.equal(lines[1], '10/01/2026;Maison Lune;;Commission;;;59,38;59,38;Payé;;"a;b ""c""";');
+  assert.equal(lines[1], '10/01/2026;Maison Lune;;Commission;;;59,38;59,38;Payé;;;"a;b ""c""";');
   assert.ok(lines[2].includes('"\'=HYPERLINK(""x"")"'));
   assert.ok(lines[2].includes(';1,00;0,00;En attente;'));
 });
@@ -176,6 +263,7 @@ test('toXLSX produit un classeur relisible avec les bons totaux', async () => {
   assert.equal(ws.rowCount, sample().length + 1);
   assert.equal(ws.getRow(2).getCell(2).value, 'Atelier Nord');
   assert.equal(ws.getRow(2).getCell(7).value, 150);
+  assert.equal(ws.getRow(1).getCell(11).value, 'Vidéo');
   const wm = wb.getWorksheet('Mois');
   assert.equal(wm.rowCount, 4 + 2);
   assert.equal(wm.getRow(2).getCell(3).value, 195);

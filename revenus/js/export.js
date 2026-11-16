@@ -1,6 +1,8 @@
-// Exports : CSV (texte) et classeur Excel (.xlsx via ExcelJS, chargé dans la page).
+// Exports : CSV (texte) et classeur Excel (.xlsx via ExcelJS, chargé à la première utilisation).
 
-import { STATUS, STATUS_LABEL, byMonth, declaredOf, fmtDate, fmtMonth, live, rateFor } from './calc.js';
+import { STATUS, STATUS_LABEL, byMonth, declaredOf, fmtDate, fmtMonth, rateFor } from './calc.js';
+
+const num = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
 const COLUMNS = [
   ['Date', (e) => fmtDate(e.date)],
@@ -13,13 +15,13 @@ const COLUMNS = [
   ['Montant déclaré', (e) => num(declaredOf(e))],
   ['Statut', (e) => STATUS_LABEL[e.status]],
   ['Facture', (e) => e.invoiceUrl],
+  ['Vidéo', (e) => e.videoUrl],
   ['Notes', (e) => e.notes],
   ['À vérifier', (e) => (e.review ? 'oui' : '')],
 ];
 
-const num = (cents) => (cents / 100).toFixed(2).replace('.', ',');
-
-export const sorted = (entries) => live(entries).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+export const sorted = (entries) =>
+  entries.filter((e) => !e.deleted).sort((a, b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt)));
 
 /** Neutralise les formules (=, +, -, @) qu'un tableur exécuterait à l'ouverture. */
 const safe = (v) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
@@ -51,9 +53,28 @@ export function download(filename, data, mime) {
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+let excelLoading;
+
+/** Charge ExcelJS (environ 1 Mo) seulement quand on en a besoin, pas à l'ouverture de l'app. */
+export function loadExcelJS(src = 'vendor/exceljs.min.js') {
+  if (globalThis.ExcelJS) return Promise.resolve(globalThis.ExcelJS);
+  excelLoading ??= new Promise((resolve, reject) => {
+    const fail = () => { excelLoading = undefined; reject(new Error('Module Excel indisponible.')); };
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => (globalThis.ExcelJS ? resolve(globalThis.ExcelJS) : fail());
+    s.onerror = fail;
+    document.head.append(s);
+  });
+  return excelLoading;
+}
+
+const text = (v) => String(v ?? '');
+const isHttp = (v) => /^https?:\/\//i.test(text(v));
+
 /** Classeur : un onglet « Paiements » (toutes les lignes) et un onglet « Mois » (totaux). */
-export async function toXLSX(state, ExcelJS = globalThis.ExcelJS) {
-  if (!ExcelJS) throw new Error('ExcelJS indisponible');
+export async function toXLSX(state, ExcelJS) {
+  ExcelJS ??= await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
   const EUR = '#,##0.00 "€"';
@@ -63,6 +84,10 @@ export async function toXLSX(state, ExcelJS = globalThis.ExcelJS) {
     row.alignment = { vertical: 'middle' };
     row.border = { bottom: { style: 'thin', color: { argb: 'FFBDBDBD' } } };
     ws.views = [{ state: 'frozen', ySplit: 1 }];
+  };
+  const link = (cell, url) => {
+    cell.value = { text: 'Ouvrir', hyperlink: url };
+    cell.font = { underline: true, color: { argb: 'FF1A56DB' } };
   };
 
   const ws = wb.addWorksheet('Paiements');
@@ -76,30 +101,30 @@ export async function toXLSX(state, ExcelJS = globalThis.ExcelJS) {
     { header: 'Montant', key: 'amount', width: 13, style: { numFmt: EUR } },
     { header: 'Montant déclaré', key: 'declared', width: 16, style: { numFmt: EUR } },
     { header: 'Statut', key: 'status', width: 12 },
-    { header: 'Facture', key: 'invoice', width: 14 },
+    { header: 'Facture', key: 'invoice', width: 10 },
+    { header: 'Vidéo', key: 'video', width: 10 },
     { header: 'Notes', key: 'notes', width: 46 },
     { header: 'À vérifier', key: 'review', width: 11 },
   ];
   const rows = sorted(state.entries);
   for (const e of rows) {
     const [y, m, d] = e.date.split('-').map(Number);
+    // Les textes passent par text() : une cellule ne peut ainsi jamais recevoir un objet (formule, lien).
     const row = ws.addRow({
       date: new Date(Date.UTC(y, m - 1, d)),
-      client: e.client,
-      endClient: e.endClient,
-      type: e.type,
-      project: e.project,
-      installment: e.installment,
+      client: text(e.client),
+      endClient: text(e.endClient),
+      type: text(e.type),
+      project: text(e.project),
+      installment: text(e.installment),
       amount: e.amount / 100,
       declared: declaredOf(e) / 100,
       status: STATUS_LABEL[e.status],
-      notes: e.notes,
+      notes: text(e.notes),
       review: e.review ? 'oui' : '',
     });
-    if (/^https?:\/\//i.test(e.invoiceUrl)) {
-      row.getCell('invoice').value = { text: 'Ouvrir', hyperlink: e.invoiceUrl };
-      row.getCell('invoice').font = { underline: true, color: { argb: 'FF1A56DB' } };
-    }
+    if (isHttp(e.invoiceUrl)) link(row.getCell('invoice'), e.invoiceUrl);
+    if (isHttp(e.videoUrl)) link(row.getCell('video'), e.videoUrl);
     if (e.status !== STATUS.PAID) row.font = { color: { argb: 'FF8A8A8A' } };
   }
   head(ws);
