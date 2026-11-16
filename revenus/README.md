@@ -5,13 +5,16 @@ App web statique, sans serveur ni étape de build : les données vivent dans le 
 
 Aucune donnée personnelle n'est stockée dans ce dépôt : l'app démarre vide et l'historique se charge par import d'une sauvegarde.
 
-## Lancer en local
+## Lancer sur son ordinateur
 
-```bash
-npx serve revenus        # ou : python3 -m http.server 4173 --directory revenus
-```
+Ouvrir `index.html` d'un double-clic ne marche pas : les navigateurs refusent de charger l'app depuis un simple fichier. Il faut passer par le petit serveur fourni (Node.js 22 ou plus récent, rien d'autre à installer) :
 
-Ouvre ensuite l'adresse affichée. Pour une mise en ligne, publie le dossier `revenus/` tel quel (GitHub Pages, ou tout hébergement de fichiers statiques).
+- **Mac** : double-clic sur `Lancer Revenus.command`. La première fois, macOS peut le bloquer : clic droit → Ouvrir.
+- **Partout** : dans ce dossier, `node serveur-local.mjs` (ou `npm start`).
+
+L'app s'ouvre sur `http://localhost:4173/`. Le serveur ne répond qu'à cet ordinateur et ne sert que ce dossier. Garde toujours cette adresse : les données du navigateur y sont attachées.
+
+Pour une mise en ligne (téléphone, autres appareils), publie ce dossier tel quel sur GitHub Pages ou tout hébergement de fichiers statiques.
 
 ## Ce que fait l'app
 
@@ -56,7 +59,7 @@ L'app demande la portée `drive.file` : elle ne voit que les fichiers qu'elle a 
 ## Tests
 
 ```bash
-node --test "revenus/test/*.test.js"
+npm test        # dans ce dossier
 ```
 
 Les tests utilisent un jeu de données inventé.
@@ -71,5 +74,6 @@ Les tests utilisent un jeu de données inventé.
 | `js/drive.js` | Connexion Google, envoi des fichiers, envoi reprenable des vidéos |
 | `js/dnd.js` | Glisser-déposer (souris, doigt, clavier) |
 | `js/app.js` | Interface |
+| `serveur-local.mjs`, `Lancer Revenus.command` | Lancement sur son ordinateur |
 | `fonts/` | Instrument Sans (licence OFL 1.1) |
 | `vendor/exceljs.min.js` | ExcelJS 4.4.0 (licence MIT) |

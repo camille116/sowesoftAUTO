@@ -380,7 +380,7 @@ textarea.field-input { height: auto; min-height: 78px; padding: 11px 14px; resiz
   .seg button, .seg label span { display: flex; align-items: center; min-height: 44px; padding: 0 14px; }
   .close { width: 44px; height: 44px; }
   .kpi-go::after, a.chip::after, .grip::after { content: ""; position: absolute; inset: -9px; }
-  .kpi-tools { gap: 14px; }
+  .kpi-tools { gap: 18px; } /* les zones de toucher élargies de la poignée et de la flèche ne se chevauchent pas */
   a.chip::after { inset: -11px -4px; }
   .link { display: inline-block; padding: 13px 0; margin: -13px 0; }
   .explain summary { padding: 12px 0; margin: -12px 0; }

@@ -1,0 +1,15 @@
+{
+  "name": "revenus",
+  "version": "1.0.0",
+  "description": "Suivi des revenus freelance : app web statique, sans serveur ni étape de build",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node serveur-local.mjs",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
