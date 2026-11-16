@@ -63,6 +63,44 @@ function render() {
   renderSync();
 }
 
+// ---------- Halo du bandeau ----------
+// Le halo réagit à trois choses, discrètement : il suit le pointeur, se replace quand on change
+// de période, et gonfle une fois quand un paiement est encaissé. L'écran étant reconstruit à chaque
+// rendu, l'état vit ici et la phase de l'animation est reprise où elle en était.
+
+const art = { mx: 0, my: 0, rx: 0, ry: 0, pulse: false, pulseTimer: 0 };
+const artStyle = () => `--mx:${art.mx.toFixed(3)};--my:${art.my.toFixed(3)};--rx:${art.rx};--ry:${art.ry};--t:-${(performance.now() / 1000).toFixed(2)}s`;
+const applyArt = () => { const el = $('.hero-art'); if (el) for (const k of ['mx', 'my', 'rx', 'ry']) el.style.setProperty(`--${k}`, art[k]); };
+
+/** Position de repos propre à chaque période : même période, même forme. */
+function artForRange(range) {
+  let h = 7;
+  for (const c of String(range)) h = (h * 31 + c.codePointAt(0)) % 997;
+  art.rx = ((h % 21) - 10) / 10;
+  art.ry = (((h * 7) % 21) - 10) / 10;
+}
+
+function pulseArt() {
+  art.pulse = true;
+  clearTimeout(art.pulseTimer);
+  art.pulseTimer = setTimeout(() => { art.pulse = false; $('.hero-art')?.classList.remove('pulse'); }, 1800);
+  $('.hero-art')?.classList.add('pulse');
+}
+
+view.addEventListener('pointermove', (ev) => {
+  const hero = ev.target.closest?.('.hero');
+  if (!hero) return;
+  const r = hero.getBoundingClientRect();
+  art.mx = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  art.my = ((ev.clientY - r.top) / r.height) * 2 - 1;
+  applyArt();
+});
+view.addEventListener('pointerout', (ev) => {
+  if (!ev.target.closest?.('.hero') || ev.relatedTarget?.closest?.('.hero')) return;
+  art.mx = 0; art.my = 0;
+  applyArt();
+});
+
 // ---------- Aperçu ----------
 
 function sumPaid(entries, test) {
@@ -136,7 +174,7 @@ function renderOverview() {
 
   view.innerHTML = `
     <section class="hero">
-      <div class="hero-art" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="hero-art${art.pulse ? ' pulse' : ''}" aria-hidden="true" style="${artStyle()}"><i></i><i></i><i></i><i></i></div>
       <div class="seg hero-seg" role="group" aria-label="Période">
         <button type="button" data-range="last12" aria-pressed="${ui.range === 'last12'}">12 mois</button>
         ${years.map((y) => `<button type="button" data-range="${y}" aria-pressed="${ui.range === y}">${y}</button>`).join('')}
@@ -427,6 +465,7 @@ function submitSheet(form) {
   }
   sheet.close();
   commit(next);
+  if (entry.status === STATUS.PAID) pulseArt();
   toast(id ? 'Paiement enregistré' : rest ? 'Paiement et solde ajoutés' : 'Paiement ajouté');
 }
 
@@ -533,7 +572,7 @@ document.addEventListener('click', (ev) => {
   const t = ev.target.closest('[data-range],[data-month],[data-review],[data-pending],[data-mark-paid],[data-edit],[data-filter],[data-clear-month],[data-export],[data-add-year],[data-drive-off],[data-close],[data-delete]');
   if (!t) return;
   const d = t.dataset;
-  if (d.range) { ui.range = d.range; renderOverview(); }
+  if (d.range) { ui.range = d.range; renderOverview(); artForRange(d.range); requestAnimationFrame(applyArt); }
   else if (d.month) { ui.month = d.month; ui.status = 'all'; ui.query = ''; }
   else if ('pending' in d) { ui.month = ''; ui.status = 'pending'; ui.query = ''; }
   else if ('review' in d) { ui.month = ''; ui.status = 'review'; ui.query = ''; }
@@ -541,6 +580,7 @@ document.addEventListener('click', (ev) => {
     const id = d.markPaid;
     const before = state.entries.find((e) => e.id === id);
     commit(store.updateEntry(state, id, { status: STATUS.PAID, date: todayISO() }));
+    pulseArt();
     toast('Marqué payé aujourd’hui', { label: 'Annuler', run: () => commit(store.updateEntry(state, id, { status: before.status, date: before.date })) });
   }
   else if (d.edit) openSheet(d.edit);

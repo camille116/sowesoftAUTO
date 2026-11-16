@@ -112,11 +112,20 @@ main { overflow-x: clip; max-width: 1280px; margin: 0 auto; padding: clamp(20px,
   border-radius: var(--r-l); color: var(--ink);
 }
 .hero-art { position: absolute; inset: 0; z-index: -1; background: #f3a04c; }
-.hero-art i { position: absolute; border-radius: 50%; filter: blur(56px); animation: drift 22s ease-in-out infinite alternate; }
-.hero-art i:nth-child(1) { width: 46%; aspect-ratio: 1; left: -8%; top: -30%; background: #f7c7d9; }
-.hero-art i:nth-child(2) { width: 38%; aspect-ratio: 1.3; left: 34%; top: -22%; background: #ea3f2c; animation-delay: -6s; }
-.hero-art i:nth-child(3) { width: 30%; aspect-ratio: 1.6; right: 4%; bottom: -18%; background: #d92f8a; animation-delay: -11s; }
-.hero-art i:nth-child(4) { width: 34%; aspect-ratio: 1; right: -8%; top: 4%; background: #f8b765; animation-delay: -16s; }
+.hero-art i {
+  --k: 1;
+  position: absolute; border-radius: 50%; filter: blur(56px);
+  /* translate suit le pointeur et la période ; transform porte la dérive lente ; scale porte le gonflement. */
+  translate: calc((var(--mx, 0) * 26px + var(--rx, 0) * 60px) * var(--k)) calc((var(--my, 0) * 20px + var(--ry, 0) * 34px) * var(--k));
+  transition: translate 1.1s cubic-bezier(.2, .7, .2, 1);
+  animation: drift 22s ease-in-out var(--t, 0s) infinite alternate;
+}
+.hero-art i:nth-child(1) { width: 46%; aspect-ratio: 1; left: -8%; top: -30%; background: #f7c7d9; --k: -.6; }
+.hero-art i:nth-child(2) { width: 38%; aspect-ratio: 1.3; left: 34%; top: -22%; background: #ea3f2c; --k: 1; animation-duration: 27s; }
+.hero-art i:nth-child(3) { width: 30%; aspect-ratio: 1.6; right: 4%; bottom: -18%; background: #d92f8a; --k: -1.2; animation-duration: 19s; }
+.hero-art i:nth-child(4) { width: 34%; aspect-ratio: 1; right: -8%; top: 4%; background: #f8b765; --k: .7; animation-duration: 31s; }
+.hero-art.pulse i { animation: drift 22s ease-in-out var(--t, 0s) infinite alternate, swell 1.8s ease-in-out 1; }
+@keyframes swell { 45% { scale: 1.28; } }
 .hero-art::after {
   content: ""; position: absolute; inset: 0; opacity: .28; mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
